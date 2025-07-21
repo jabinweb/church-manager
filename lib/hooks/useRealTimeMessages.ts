@@ -44,7 +44,7 @@ export function useRealTimeMessages(userId?: string) {
   const handleNewMessage = useCallback((message: Message) => {
     console.log('Real-time: New message received:', message)
     
-    // Add message to current conversation
+    // Add message to current conversation if it matches
     setMessages(prev => {
       const exists = prev.some(m => m.id === message.id)
       if (exists) {
@@ -55,11 +55,31 @@ export function useRealTimeMessages(userId?: string) {
       console.log('Adding new message to messages array')
       const newMessages = [...prev, message]
       
-      // Trigger scroll event for new message
+      // Trigger notification events for new message
+      const isReceived = message.receiverId === userId
+      const isSent = message.senderId === userId
+      
+      console.log('Dispatching notification events:', { isReceived, isSent, userId })
+      
       setTimeout(() => {
+        // Dispatch both events to ensure compatibility
         window.dispatchEvent(new CustomEvent('newMessageReceived', { 
-          detail: { message, isReceived: message.receiverId === userId } 
+          detail: { 
+            message, 
+            isReceived,
+            isSent
+          } 
         }))
+        
+        // Also dispatch raw SSE message event
+        window.dispatchEvent(new CustomEvent('sseMessage', {
+          detail: {
+            type: 'new_message',
+            data: { message }
+          }
+        }))
+        
+        console.log('Notification events dispatched')
       }, 100)
       
       return newMessages
@@ -138,11 +158,12 @@ export function useRealTimeMessages(userId?: string) {
   useEffect(() => {
     const handleSSEMessage = (event: CustomEvent) => {
       const { type, data } = event.detail
-      console.log('SSE Message received:', type, data)
+      console.log('SSE Message received in hook:', type, data)
 
       switch (type) {
         case 'new_message':
           if (data && data.message) {
+            console.log('Processing new_message in hook:', data.message)
             handleNewMessage(data.message)
           }
           break
@@ -159,14 +180,16 @@ export function useRealTimeMessages(userId?: string) {
         case 'connected':
           console.log('SSE connected for user:', data?.userId)
           break
+        default:
+          console.log('Unknown SSE message type:', type)
       }
     }
 
-    console.log('Adding SSE message listener')
+    console.log('Adding SSE message listener in hook')
     window.addEventListener('sseMessage', handleSSEMessage as EventListener)
     
     return () => {
-      console.log('Removing SSE message listener')
+      console.log('Removing SSE message listener in hook')
       window.removeEventListener('sseMessage', handleSSEMessage as EventListener)
     }
   }, [handleNewMessage, handleMessagesRead, handleUserTyping])

@@ -21,11 +21,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
+    <div className="h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 overflow-hidden">
       {/* Mobile Header */}
       <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
       
-      <div className="flex">
+      <div className="flex h-full">
         {/* Sidebar */}
         <DashboardSidebar 
           isMobileOpen={isMobileMenuOpen} 
@@ -33,9 +33,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         />
         
         {/* Main Content */}
-        <main className={cn("flex-1 overflow-auto min-h-screen lg:min-h-0")}>
+        <main className={cn("flex-1 overflow-hidden")}>
           <Suspense fallback={<DashboardLoadingFallback />}>
-            <div className="p-4 lg:p-6">
+            <div className="h-full">
               {children}
             </div>
           </Suspense>

@@ -87,6 +87,9 @@ export const metadata: Metadata = {
         media: '(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)'
       }
     ]
+  },
+  other: {
+    'notification-permission': 'default',
   }
 }
 
@@ -116,6 +119,11 @@ export default async function PublicRootLayout({
         <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#7c3aed" />
         <meta name="msapplication-TileColor" content="#7c3aed" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
+        {/* Add notification support meta tags */}
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <link rel="manifest" href="/manifest.json" />
       </head>
       <body className={inter.className}>
             <Providers session={session}>
