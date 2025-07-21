@@ -77,6 +77,8 @@ interface FileStats {
     blobFiles: number
     inSync: boolean
     sizeDifference: number
+    error?: boolean // Add error property
+    fallback?: boolean // Add fallback property for when using DB stats
   }
 }
 
@@ -631,7 +633,7 @@ export default function FileManagementPage() {
                     <p className="text-purple-100 text-sm font-medium">Folders</p>
                     <p className="text-3xl font-bold">{stats.totalFolders}</p>
                     {stats.syncStatus && (
-                      <p className={`text-xs ${stats.syncStatus.inSync ? 'text-purple-200' : 'text-yellow-200'}`}>
+                      <p className={`text-xs ${stats.syncStatus.error ? 'text-red-200' : stats.syncStatus.inSync ? 'text-purple-200' : 'text-yellow-200'}`}>
                         {stats.syncStatus.error ? 'Sync Error' : stats.syncStatus.inSync ? 'In Sync' : 'Sync Needed'}
                       </p>
                     )}

@@ -23,7 +23,9 @@ export async function GET(request: NextRequest) {
       dbFiles: fileStats.totalFiles,
       blobFiles: blobStats.blobCount,
       inSync: Math.abs(fileStats.totalFiles - blobStats.blobCount) <= 5, // Allow small variance
-      sizeDifference: Math.abs(fileStats.totalSize - blobStats.totalSize)
+      sizeDifference: Math.abs(fileStats.totalSize - blobStats.totalSize),
+      error: blobStats.error || false,
+      fallback: blobStats.fallback || false
     }
 
     const stats = {
