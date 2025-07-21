@@ -1,7 +1,6 @@
-
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,6 +26,7 @@ import { toast } from 'sonner'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { useRealTimeMessages } from '@/lib/hooks/useRealTimeMessages'
 
 interface Message {
   id: string
@@ -69,8 +69,17 @@ interface User {
 
 export default function MessagesPage() {
   const { data: session } = useSession()
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [messages, setMessages] = useState<Message[]>([])
+  const {
+    conversations,
+    setConversations,
+    messages,
+    setMessages,
+    typingUsers,
+    isConnected,
+    markAsRead,
+    sendTypingIndicator
+  } = useRealTimeMessages(session?.user?.id)
+
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [newMessage, setNewMessage] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -80,19 +89,14 @@ export default function MessagesPage() {
   const [newConversationOpen, setNewConversationOpen] = useState(false)
   const [users, setUsers] = useState<User[]>([])
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [isTyping, setIsTyping] = useState(false)
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null)
+  const [pendingMessages, setPendingMessages] = useState<Set<string>>(new Set())
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const messageInputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    fetchConversations()
-    fetchUsers()
-  }, [])
-
-  useEffect(() => {
-    if (selectedConversation) {
-      fetchMessages(selectedConversation.id)
-    }
-  }, [selectedConversation])
-
-  const fetchConversations = async () => {
+  const fetchConversations = useCallback(async () => {
     try {
       const response = await fetch('/api/messages/conversations')
       if (response.ok) {
@@ -105,34 +109,9 @@ export default function MessagesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [setConversations])
 
-  const fetchMessages = async (conversationId: string) => {
-    setMessagesLoading(true)
-    try {
-      const response = await fetch(`/api/messages/conversations/${conversationId}`)
-      if (response.ok) {
-        const data = await response.json()
-        setMessages(data.messages || [])
-        
-        // Mark messages as read
-        await fetch(`/api/messages/conversations/${conversationId}/read`, {
-          method: 'POST'
-        })
-        
-        // Update conversation unread count
-        setConversations(prev => prev.map(conv => 
-          conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv
-        ))
-      }
-    } catch (error) {
-      console.error('Error fetching messages:', error)
-    } finally {
-      setMessagesLoading(false)
-    }
-  }
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const response = await fetch('/api/directory')
       if (response.ok) {
@@ -147,10 +126,143 @@ export default function MessagesPage() {
     } catch (error) {
       console.error('Error fetching users:', error)
     }
-  }
+  }, [])
 
+  useEffect(() => {
+    fetchConversations()
+    fetchUsers()
+  }, [fetchConversations, fetchUsers])
+
+  const fetchMessages = useCallback(async (conversationId: string) => {
+    setMessagesLoading(true)
+    try {
+      const response = await fetch(`/api/messages/conversations/${conversationId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setMessages(data.messages || [])
+        
+        // Mark messages as read
+        await markAsRead(conversationId)
+        
+        // Update conversation unread count locally
+        setConversations(prev => prev.map(conv => 
+          conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv
+        ))
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', error)
+    } finally {
+      setMessagesLoading(false)
+    }
+  }, [markAsRead, setConversations, setMessages])
+
+  useEffect(() => {
+    if (selectedConversation) {
+      fetchMessages(selectedConversation.id)
+    }
+  }, [selectedConversation, fetchMessages])
+
+  // Handle typing indicator with debouncing
+  const handleTyping = useCallback((value: string) => {
+    setNewMessage(value)
+    
+    if (!selectedConversation) return
+
+    if (value.trim() && !isTyping) {
+      setIsTyping(true)
+      sendTypingIndicator(selectedConversation.id, true)
+    }
+
+    // Clear existing timeout
+    if (typingTimeout) {
+      clearTimeout(typingTimeout)
+    }
+
+    // Set new timeout to stop typing indicator
+    const timeout = setTimeout(() => {
+      if (isTyping) {
+        setIsTyping(false)
+        sendTypingIndicator(selectedConversation.id, false)
+      }
+    }, 2000)
+
+    setTypingTimeout(timeout)
+  }, [selectedConversation, isTyping, sendTypingIndicator, typingTimeout])
+
+  // Auto-scroll to bottom
+  const scrollToBottom = useCallback(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [])
+
+  // Scroll to bottom when new messages arrive, conversation changes, or typing status changes
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, scrollToBottom])
+
+  // Scroll when typing users change (someone starts/stops typing)
+  useEffect(() => {
+    if (selectedConversation && typingUsers.size > 0) {
+      const hasTypingInCurrentConversation = Array.from(typingUsers).some(userId => 
+        userId !== session?.user?.id && 
+        selectedConversation.participants.some(p => p.id === userId)
+      )
+      
+      if (hasTypingInCurrentConversation) {
+        setTimeout(scrollToBottom, 100)
+      }
+    }
+  }, [typingUsers, selectedConversation, session?.user?.id, scrollToBottom])
+
+  // Also scroll when selectedConversation changes
+  useEffect(() => {
+    if (selectedConversation) {
+      // Slight delay to ensure messages are loaded
+      setTimeout(scrollToBottom, 100)
+    }
+  }, [selectedConversation, scrollToBottom])
+
+  // Send message function
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation) return
+
+    // Stop typing indicator
+    if (isTyping) {
+      setIsTyping(false)
+      sendTypingIndicator(selectedConversation.id, false)
+    }
+
+    // Create temporary message for instant display
+    const tempMessage: Message = {
+      id: `temp-${Date.now()}`,
+      content: newMessage.trim(),
+      senderId: session?.user?.id || '',
+      receiverId: selectedConversation.participants.find(p => p.id !== session?.user?.id)?.id || '',
+      conversationId: selectedConversation.id,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+      sender: {
+        id: session?.user?.id || '',
+        name: session?.user?.name || null,
+        image: session?.user?.image || null
+      },
+      receiver: {
+        id: selectedConversation.participants.find(p => p.id !== session?.user?.id)?.id || '',
+        name: selectedConversation.participants.find(p => p.id !== session?.user?.id)?.name || null,
+        image: selectedConversation.participants.find(p => p.id !== session?.user?.id)?.image || null
+      }
+    }
+
+    // Add to messages immediately for instant display
+    setMessages(prev => [...prev, tempMessage])
+    setPendingMessages(prev => new Set([...Array.from(prev), tempMessage.id]))
+    
+    const messageContent = newMessage.trim()
+    setNewMessage('')
+
+    // Auto-scroll immediately after adding optimistic message
+    setTimeout(scrollToBottom, 10)
 
     setSending(true)
     try {
@@ -159,14 +271,23 @@ export default function MessagesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           conversationId: selectedConversation.id,
-          content: newMessage.trim()
+          content: messageContent
         })
       })
 
       if (response.ok) {
         const data = await response.json()
-        setMessages(prev => [...prev, data.message])
-        setNewMessage('')
+        console.log('Message sent successfully:', data.message)
+        
+        // Replace temporary message with actual message
+        setMessages(prev => prev.map(msg => 
+          msg.id === tempMessage.id ? data.message : msg
+        ))
+        setPendingMessages(prev => {
+          const newSet = new Set(Array.from(prev))
+          newSet.delete(tempMessage.id)
+          return newSet
+        })
         
         // Update conversation with new last message
         setConversations(prev => prev.map(conv => 
@@ -174,15 +295,74 @@ export default function MessagesPage() {
             ? { ...conv, lastMessage: data.message, updatedAt: data.message.createdAt }
             : conv
         ))
+
+        // Auto-focus input after message is sent
+        setTimeout(() => {
+          messageInputRef.current?.focus()
+        }, 10)
       } else {
+        // Remove failed message
+        setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id))
+        setPendingMessages(prev => {
+          const newSet = new Set(Array.from(prev))
+          newSet.delete(tempMessage.id)
+          return newSet
+        })
+        
         const error = await response.json()
         toast.error(error.error || 'Failed to send message')
+        
+        // Focus input even if there's an error
+        setTimeout(() => {
+          messageInputRef.current?.focus()
+        }, 10)
       }
     } catch (error) {
+      // Remove failed message
+      setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id))
+      setPendingMessages(prev => {
+        const newSet = new Set(Array.from(prev))
+        newSet.delete(tempMessage.id)
+        return newSet
+      })
+      
       console.error('Error sending message:', error)
       toast.error('Failed to send message')
+      
+      // Focus input even if there's an error
+      setTimeout(() => {
+        messageInputRef.current?.focus()
+      }, 10)
     } finally {
       setSending(false)
+    }
+  }
+
+  // Function to get message status
+  const getMessageStatus = (message: Message) => {
+    if (message.senderId !== session?.user?.id) return null // Don't show status for received messages
+    
+    if (pendingMessages.has(message.id)) {
+      return 'pending' // No check - message is being sent
+    }
+    
+    if (message.isRead) {
+      return 'read' // Double check - message was read
+    }
+    
+    return 'delivered' // Single check - message was delivered but not read
+  }
+
+  const renderMessageStatus = (status: string | null) => {
+    switch (status) {
+      case 'pending':
+        return <Clock className="h-3 w-3 opacity-50" />
+      case 'delivered':
+        return <Check className="h-3 w-3" />
+      case 'read':
+        return <CheckCheck className="h-3 w-3" />
+      default:
+        return null
     }
   }
 
@@ -190,6 +370,18 @@ export default function MessagesPage() {
     if (!selectedUser) return
 
     try {
+      // Check if conversation already exists locally first
+      const existingConversation = conversations.find(conv => 
+        conv.participants.some(p => p.id === selectedUser.id)
+      )
+
+      if (existingConversation) {
+        setSelectedConversation(existingConversation)
+        setNewConversationOpen(false)
+        setSelectedUser(null)
+        return
+      }
+
       const response = await fetch('/api/messages/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -200,7 +392,20 @@ export default function MessagesPage() {
 
       if (response.ok) {
         const data = await response.json()
-        setConversations(prev => [data.conversation, ...prev])
+        
+        // Check if this conversation already exists in our list
+        const existingIndex = conversations.findIndex(conv => conv.id === data.conversation.id)
+        
+        if (existingIndex >= 0) {
+          // Update existing conversation
+          setConversations(prev => prev.map((conv, index) => 
+            index === existingIndex ? data.conversation : conv
+          ))
+        } else {
+          // Add new conversation
+          setConversations(prev => [data.conversation, ...prev])
+        }
+        
         setSelectedConversation(data.conversation)
         setNewConversationOpen(false)
         setSelectedUser(null)
@@ -231,6 +436,19 @@ export default function MessagesPage() {
     )
   )
 
+  // Add debugging
+  useEffect(() => {
+    console.log('Messages page mounted')
+    console.log('Session user:', session?.user?.id)
+    console.log('SSE connected:', isConnected)
+    console.log('Current messages count:', messages.length)
+  }, [session?.user?.id, isConnected, messages.length])
+
+  // Log when new messages arrive
+  useEffect(() => {
+    console.log('Messages updated:', messages.length, messages)
+  }, [messages])
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -241,6 +459,18 @@ export default function MessagesPage() {
 
   return (
     <div className="h-screen bg-gray-50 flex">
+      {/* Connection status indicator */}
+      <div className={`fixed top-4 right-4 z-50 px-3 py-1 rounded-full text-xs font-medium ${
+        isConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+      }`}>
+        {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+      </div>
+
+      {/* Debug info - remove in production */}
+      <div className="fixed top-4 left-4 z-50 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+        Messages: {messages.length} | SSE: {isConnected ? 'ON' : 'OFF'}
+      </div>
+
       {/* Conversations Sidebar */}
       <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
         {/* Header */}
@@ -397,52 +627,72 @@ export default function MessagesPage() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div 
+              ref={messagesContainerRef}
+              className="flex-1 overflow-y-auto p-4 space-y-4"
+            >
               {messagesLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
                 </div>
-              ) : messages.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <MessageCircle className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                  <p>No messages yet. Start the conversation!</p>
-                </div>
               ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      "flex",
-                      message.senderId === session?.user?.id ? "justify-end" : "justify-start"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "max-w-xs lg:max-w-md px-4 py-2 rounded-lg",
-                        message.senderId === session?.user?.id
-                          ? "bg-purple-600 text-white"
-                          : "bg-gray-200 text-gray-900"
-                      )}
-                    >
-                      <p>{message.content}</p>
-                      <div className={cn(
-                        "flex items-center justify-end mt-1 space-x-1",
-                        message.senderId === session?.user?.id ? "text-purple-200" : "text-gray-500"
-                      )}>
-                        <span className="text-xs">
-                          {format(new Date(message.createdAt), 'HH:mm')}
-                        </span>
-                        {message.senderId === session?.user?.id && (
-                          message.isRead ? (
-                            <CheckCheck className="h-3 w-3" />
-                          ) : (
-                            <Check className="h-3 w-3" />
-                          )
+                <>
+                  {messages.map((message) => {
+                    const messageStatus = getMessageStatus(message)
+                    const isPending = pendingMessages.has(message.id)
+                    
+                    return (
+                      <div
+                        key={message.id}
+                        className={cn(
+                          "flex",
+                          message.senderId === session?.user?.id ? "justify-end" : "justify-start"
                         )}
+                      >
+                        <div
+                          className={cn(
+                            "max-w-xs lg:max-w-md px-4 py-2 rounded-lg transition-opacity",
+                            message.senderId === session?.user?.id
+                              ? "bg-purple-600 text-white"
+                              : "bg-gray-200 text-gray-900",
+                            isPending && "opacity-70"
+                          )}
+                        >
+                          <p>{message.content}</p>
+                          <div className={cn(
+                            "flex items-center justify-end mt-1 space-x-1",
+                            message.senderId === session?.user?.id ? "text-purple-200" : "text-gray-500"
+                          )}>
+                            <span className="text-xs">
+                              {format(new Date(message.createdAt), 'HH:mm')}
+                            </span>
+                            {messageStatus && renderMessageStatus(messageStatus)}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  
+                  {/* Typing indicator with auto-scroll trigger */}
+                  {Array.from(typingUsers).some(userId => 
+                    userId !== session?.user?.id && 
+                    selectedConversation.participants.some(p => p.id === userId)
+                  ) && (
+                    <div className="flex justify-start">
+                      <div className="bg-gray-200 text-gray-900 px-4 py-2 rounded-lg">
+                        <div className="flex space-x-1 items-center">
+                          <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          <span className="text-xs text-gray-600 ml-2">typing...</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  )}
+                  
+                  {/* Invisible div for auto-scroll target */}
+                  <div ref={messagesEndRef} />
+                </>
               )}
             </div>
 
@@ -450,11 +700,19 @@ export default function MessagesPage() {
             <div className="p-4 border-t border-gray-200 bg-white">
               <div className="flex space-x-2">
                 <Input
+                  ref={messageInputRef}
                   value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
+                  onChange={(e) => handleTyping(e.target.value)}
                   placeholder="Type a message..."
-                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                  className="flex-1"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      sendMessage()
+                    }
+                  }}
+                  className="flex-1 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  disabled={sending}
+                  autoFocus={!!selectedConversation}
                 />
                 <Button
                   onClick={sendMessage}
@@ -557,3 +815,4 @@ export default function MessagesPage() {
     </div>
   )
 }
+

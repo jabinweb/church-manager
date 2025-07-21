@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
+import { broadcastToUser } from '@/lib/sse-manager'
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,33 +14,44 @@ export async function POST(request: NextRequest) {
     const { conversationId, content } = await request.json()
 
     if (!conversationId || !content?.trim()) {
-      return NextResponse.json({ error: 'Conversation ID and content are required' }, { status: 400 })
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Get conversation to find the receiver
-    const conversation = await prisma.conversation.findUnique({
-      where: { id: conversationId },
+    // Verify user is participant in this conversation and get the other participant
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        id: conversationId,
+        participants: {
+          some: {
+            userId: session.user.id
+          }
+        }
+      },
       include: {
-        participants: true
+        participants: {
+          where: {
+            userId: {
+              not: session.user.id
+            }
+          }
+        }
       }
     })
 
-    if (!conversation) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+    if (!conversation || conversation.participants.length === 0) {
+      return NextResponse.json({ error: 'Conversation not found or invalid' }, { status: 404 })
     }
 
-    const receiverParticipant = conversation.participants.find(p => p.userId !== session.user.id)
-    if (!receiverParticipant) {
-      return NextResponse.json({ error: 'Receiver not found' }, { status: 404 })
-    }
+    const receiverId = conversation.participants[0].userId
 
-    // Create message
+    // Create the message
     const message = await prisma.message.create({
       data: {
         content: content.trim(),
         senderId: session.user.id,
-        receiverId: receiverParticipant.userId,
-        conversationId
+        receiverId,
+        conversationId,
+        isRead: false // Always start as unread
       },
       include: {
         sender: {
@@ -65,7 +77,25 @@ export async function POST(request: NextRequest) {
       data: { updatedAt: new Date() }
     })
 
-    return NextResponse.json({ message })
+    const formattedMessage = {
+      ...message,
+      createdAt: message.createdAt.toISOString()
+    }
+
+    console.log('Sending message to receiver:', receiverId)
+    
+    // Broadcast new message via SSE to the recipient
+    const broadcastSuccess = broadcastToUser(receiverId, {
+      type: 'new_message',
+      data: {
+        message: formattedMessage,
+        conversationId
+      }
+    })
+
+    console.log('Broadcast success:', broadcastSuccess)
+
+    return NextResponse.json({ message: formattedMessage })
   } catch (error) {
     console.error('Error sending message:', error)
     return NextResponse.json({ error: 'Failed to send message' }, { status: 500 })
