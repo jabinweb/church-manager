@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { useSystemSettings } from '@/lib/useSystemSettings'
 import { format } from 'date-fns'
+import SermonCard from '@/components/sermon/SermonCard'
 
 interface HomePageData {
   recentSermons: Array<{
@@ -37,6 +38,13 @@ interface HomePageData {
     slug: string
     imageUrl?: string
     views: number
+    series?: string | null
+    duration?: string | null
+    isPublished: boolean
+    audioUrl?: string | null
+    videoUrl?: string | null
+    scriptureReference?: string | null
+    tags: string[]
   }>
   upcomingEvents: Array<{
     id: string
@@ -309,40 +317,12 @@ export default function Home() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: index * 0.1 }}
                 >
-                  <Card className="group hover:shadow-xl transition-all duration-300 overflow-hidden border-0 h-full">
-                    <div className="relative h-48 overflow-hidden">
-                      <Image
-                        src={sermon.imageUrl || '/images/sermon-default.jpg'}
-                        alt={sermon.title}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.src = "https://placehold.co/400x300/7c3aed/white?text=Sermon"
-                        }}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                      <div className="absolute bottom-4 left-4 text-white">
-                        <BookOpen className="h-5 w-5" />
-                      </div>
-                    </div>
-                    <CardContent className="p-6">
-                      <h3 className="text-lg font-bold mb-2 group-hover:text-purple-600 transition-colors line-clamp-2 leading-tight">
-                        {sermon.title}
-                      </h3>
-                      <p className="text-gray-600 mb-4 text-sm">By {sermon.speaker}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">
-                          {format(new Date(sermon.date), 'MMM dd, yyyy')}
-                        </span>
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/sermons/${sermon.slug}`}>
-                            Listen <Play className="ml-1 h-3 w-3" />
-                          </Link>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <SermonCard 
+                    sermon={sermon} 
+                    index={index}
+                    priority={index < 3}
+                    showActions={false}
+                  />
                 </motion.div>
               ))}
             </div>

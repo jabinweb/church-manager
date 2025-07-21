@@ -19,23 +19,28 @@ import { ArrowLeft, Save, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import Image from 'next/image'
+import ImageUpload from './ImageUpload'
 
 interface Product {
   id?: string
   name: string
-  description: string
+  description: string | null
   price: number
-  discount: number
-  images: string[]
-  stock: number
-  sku: string
+  sku: string | null
+  slug?: string | null
+  imageUrl: string | null
+  stockQuantity: number
   isActive: boolean
-  categoryId: string
+  categoryId: string | null
+  tags: string[]
+  authorId?: string | null
 }
 
-interface Category {
+interface ProductCategory {
   id: string
   name: string
+  description?: string | null
+  isActive: boolean
 }
 
 interface ProductFormProps {
@@ -45,17 +50,18 @@ interface ProductFormProps {
 export function ProductForm({ product }: ProductFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [categories, setCategories] = useState<Category[]>([])
+  const [categories, setCategories] = useState<ProductCategory[]>([])
+  const [loadingCategories, setLoadingCategories] = useState(true)
   const [formData, setFormData] = useState<Product>({
     name: '',
-    description: '',
+    description: null,
     price: 0,
-    discount: 0,
-    images: [],
-    stock: 0,
-    sku: '',
+    sku: null,
+    imageUrl: null,
+    stockQuantity: 0,
     isActive: true,
-    categoryId: '',
+    categoryId: null,
+    tags: [],
     ...product
   })
 
@@ -65,11 +71,20 @@ export function ProductForm({ product }: ProductFormProps) {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/categories')
-      const data = await response.json()
-      setCategories(data)
+      setLoadingCategories(true)
+      const response = await fetch('/api/admin/shop/categories')
+      if (response.ok) {
+        const data = await response.json()
+        setCategories(data)
+      } else {
+        console.error('Failed to fetch categories')
+        toast.error('Failed to load categories')
+      }
     } catch (error) {
       console.error('Error fetching categories:', error)
+      toast.error('Failed to load categories')
+    } finally {
+      setLoadingCategories(false)
     }
   }
 
@@ -77,48 +92,77 @@ export function ProductForm({ product }: ProductFormProps) {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files) return
-
-    // Mock image upload - replace with actual upload logic
-    const newImages = Array.from(files).map(file => URL.createObjectURL(file))
-    setFormData(prev => ({ 
-      ...prev, 
-      images: [...prev.images, ...newImages] 
-    }))
+  const handleTagsChange = (tagsString: string) => {
+    const tags = tagsString.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+    setFormData(prev => ({ ...prev, tags }))
   }
 
-  const removeImage = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index)
-    }))
+  const generateSKU = () => {
+    if (!formData.name) {
+      toast.error('Please enter a product name first')
+      return
+    }
+    
+    const prefix = formData.name.substring(0, 3).toUpperCase()
+    const timestamp = Date.now().toString().slice(-6)
+    const generatedSKU = `${prefix}-${timestamp}`
+    
+    setFormData(prev => ({ ...prev, sku: generatedSKU }))
+    toast.success('SKU generated successfully')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validation
+    if (!formData.name.trim()) {
+      toast.error('Product name is required')
+      return
+    }
+    
+    if (formData.price <= 0) {
+      toast.error('Price must be greater than 0')
+      return
+    }
+
     setLoading(true)
 
     try {
       const url = product 
-        ? `/api/admin/products/${product.id}` 
-        : '/api/admin/products'
+        ? `/api/admin/shop/products/${product.id}` 
+        : '/api/admin/shop/products'
       
       const method = product ? 'PUT' : 'POST'
+
+      // Prepare data for API - match schema exactly
+      const submitData = {
+        name: formData.name.trim(),
+        description: formData.description?.trim() || null,
+        price: Number(formData.price),
+        sku: formData.sku?.trim() || null,
+        imageUrl: formData.imageUrl,
+        stockQuantity: Number(formData.stockQuantity),
+        isActive: formData.isActive,
+        categoryId: formData.categoryId || null,
+        tags: formData.tags
+      }
 
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(submitData)
       })
 
-      if (!response.ok) throw new Error('Failed to save product')
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save product')
+      }
 
       toast.success(`Product ${product ? 'updated' : 'created'} successfully`)
-      router.push('/admin/products')
+      router.push('/admin/shop/products')
     } catch (error) {
-      toast.error(`Failed to ${product ? 'update' : 'create'} product`)
+      console.error('Product save error:', error)
+      toast.error(error instanceof Error ? error.message : `Failed to ${product ? 'update' : 'create'} product`)
     } finally {
       setLoading(false)
     }
@@ -147,11 +191,12 @@ export function ProductForm({ product }: ProductFormProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="name">Product Name</Label>
+                <Label htmlFor="name">Product Name *</Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => handleInputChange('name', e.target.value)}
+                  placeholder="Enter product name"
                   required
                 />
               </div>
@@ -160,89 +205,77 @@ export function ProductForm({ product }: ProductFormProps) {
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
-                  value={formData.description}
+                  value={formData.description || ''}
                   onChange={(e) => handleInputChange('description', e.target.value)}
+                  placeholder="Enter product description"
                   rows={4}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="sku">SKU</Label>
-                  <Input
-                    id="sku"
-                    value={formData.sku}
-                    onChange={(e) => handleInputChange('sku', e.target.value)}
-                    required
-                  />
+                  <div className="flex space-x-2">
+                    <Input
+                      id="sku"
+                      value={formData.sku || ''}
+                      onChange={(e) => handleInputChange('sku', e.target.value || null)}
+                      placeholder="Enter SKU (optional)"
+                    />
+                    <Button type="button" variant="outline" onClick={generateSKU}>
+                      Generate
+                    </Button>
+                  </div>
                 </div>
                 <div>
                   <Label htmlFor="category">Category</Label>
-                  <Select value={formData.categoryId} onValueChange={(value) => handleInputChange('categoryId', value)}>
+                  <Select 
+                    value={formData.categoryId || 'none'} 
+                    onValueChange={(value) => handleInputChange('categoryId', value === 'none' ? null : value)}
+                    disabled={loadingCategories}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
+                      <SelectValue placeholder={loadingCategories ? "Loading..." : "Select category"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="none">No Category</SelectItem>
+                      {categories
+                        .filter(cat => cat.isActive)
+                        .map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div>
+                <Label htmlFor="tags">Tags</Label>
+                <Input
+                  id="tags"
+                  value={formData.tags.join(', ')}
+                  onChange={(e) => handleTagsChange(e.target.value)}
+                  placeholder="Enter tags separated by commas"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Separate multiple tags with commas
+                </p>
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Product Images</CardTitle>
+              <CardTitle>Product Image</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Label htmlFor="images" className="cursor-pointer">
-                    <div className="flex items-center space-x-2 px-4 py-2 border border-dashed border-gray-300 rounded-lg hover:border-gray-400">
-                      <Upload className="h-4 w-4" />
-                      <span>Upload Images</span>
-                    </div>
-                  </Label>
-                  <Input
-                    id="images"
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                </div>
-
-                {formData.images.length > 0 && (
-                  <div className="grid grid-cols-3 gap-4">
-                    {formData.images.map((image, index) => (
-                      <div key={index} className="relative group">
-                        <Image
-                          src={image}
-                          alt={`Product image ${index + 1}`}
-                          width={150}
-                          height={150}
-                          className="rounded-lg object-cover w-full h-32"
-                        />
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => removeImage(index)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <ImageUpload
+                value={formData.imageUrl || ''}
+                onChange={(url) => handleInputChange('imageUrl', url)}
+                onRemove={() => handleInputChange('imageUrl', null)}
+              />
             </CardContent>
           </Card>
         </div>
@@ -254,38 +287,28 @@ export function ProductForm({ product }: ProductFormProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="price">Price (₹)</Label>
+                <Label htmlFor="price">Price ($) *</Label>
                 <Input
                   id="price"
                   type="number"
                   step="0.01"
+                  min="0"
                   value={formData.price}
                   onChange={(e) => handleInputChange('price', parseFloat(e.target.value) || 0)}
+                  placeholder="0.00"
                   required
                 />
               </div>
 
               <div>
-                <Label htmlFor="discount">Discount (%)</Label>
+                <Label htmlFor="stockQuantity">Stock Quantity</Label>
                 <Input
-                  id="discount"
+                  id="stockQuantity"
                   type="number"
                   min="0"
-                  max="100"
-                  value={formData.discount}
-                  onChange={(e) => handleInputChange('discount', parseInt(e.target.value) || 0)}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="stock">Stock Quantity</Label>
-                <Input
-                  id="stock"
-                  type="number"
-                  min="0"
-                  value={formData.stock}
-                  onChange={(e) => handleInputChange('stock', parseInt(e.target.value) || 0)}
-                  required
+                  value={formData.stockQuantity}
+                  onChange={(e) => handleInputChange('stockQuantity', parseInt(e.target.value) || 0)}
+                  placeholder="0"
                 />
               </div>
             </CardContent>
@@ -293,24 +316,57 @@ export function ProductForm({ product }: ProductFormProps) {
 
           <Card>
             <CardHeader>
-              <CardTitle>Status</CardTitle>
+              <CardTitle>Product Status</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
-                <Label htmlFor="isActive">Active Status</Label>
+                <div>
+                  <Label htmlFor="isActive">Active Status</Label>
+                  <p className="text-sm text-gray-500">
+                    {formData.isActive ? 'Product is visible to customers' : 'Product is hidden from customers'}
+                  </p>
+                </div>
                 <Switch
                   id="isActive"
                   checked={formData.isActive}
                   onCheckedChange={(checked) => handleInputChange('isActive', checked)}
                 />
               </div>
-              <p className="text-sm text-gray-500 mt-2">
-                {formData.isActive ? 'Product is visible to customers' : 'Product is hidden from customers'}
-              </p>
             </CardContent>
           </Card>
+
+          {formData.tags.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Product Tags</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {formData.tags.map((tag, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newTags = formData.tags.filter((_, i) => i !== index)
+                          handleInputChange('tags', newTags)
+                        }}
+                        className="ml-1 inline-flex items-center justify-center w-4 h-4 text-blue-400 hover:text-blue-600"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </form>
   )
 }
+                  

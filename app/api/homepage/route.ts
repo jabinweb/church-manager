@@ -3,84 +3,87 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET() {
   try {
-    // Fetch all data concurrently for better performance
-    const [recentSermons, upcomingEvents, recentPosts, stats] = await Promise.all([
-      // Recent Sermons
-      prisma.sermon.findMany({
-        where: { isPublished: true },
-        orderBy: { date: 'desc' },
-        take: 3,
-        select: {
-          id: true,
-          title: true,
-          speaker: true,
-          date: true,
-          slug: true,
-          views: true
+    // Fetch recent sermons with all required fields
+    const recentSermons = await prisma.sermon.findMany({
+      where: { isPublished: true },
+      orderBy: { date: 'desc' },
+      take: 3,
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        speaker: true,
+        series: true,
+        date: true,
+        duration: true,
+        views: true,
+        isPublished: true,
+        audioUrl: true,
+        videoUrl: true,
+        scriptureReference: true,
+        tags: true,
+        // Add imageUrl if it exists in your schema, otherwise we'll use default
+      }
+    })
+
+    // Fetch upcoming events
+    const upcomingEvents = await prisma.event.findMany({
+      where: { 
+        isPublished: true,
+        startDate: { gte: new Date() }
+      },
+      orderBy: { startDate: 'asc' },
+      take: 3,
+      select: {
+        id: true,
+        title: true,
+        startDate: true,
+        location: true,
+        category: true,
+        imageUrl: true,
+      }
+    })
+
+    // Fetch recent blog posts
+    const recentPosts = await prisma.blogPost.findMany({
+      where: { isPublished: true },
+      orderBy: { publishDate: 'desc' },
+      take: 3,
+      include: {
+        author: {
+          select: { name: true }
         }
-      }),
+      }
+    })
 
-      // Upcoming Events
-      prisma.event.findMany({
-        where: {
-          isPublished: true,
-          startDate: { gte: new Date() }
-        },
-        orderBy: { startDate: 'asc' },
-        take: 3,
-        select: {
-          id: true,
-          title: true,
-          startDate: true,
-          location: true,
-          imageUrl: true,
-          category: true
-        }
-      }),
-
-      // Recent Blog Posts
-      prisma.blogPost.findMany({
-        where: { isPublished: true },
-        orderBy: { publishDate: 'desc' },
-        take: 3,
-        select: {
-          id: true,
-          title: true,
-          excerpt: true,
-          slug: true,
-          publishDate: true,
-          imageUrl: true,
-          author: {
-            select: { name: true }
-          }
-        }
-      }),
-
-      // Stats
-      Promise.all([
-        prisma.user.count({ where: { role: { in: ['MEMBER', 'STAFF', 'PASTOR'] } } }),
-        prisma.sermon.count({ where: { isPublished: true } }),
-        prisma.event.count({ where: { isPublished: true } }),
-        prisma.prayerRequest.count()
-      ])
-    ])
-
-    const [totalMembers, totalSermons, totalEvents, totalPrayerRequests] = stats
+    // Get stats
+    const stats = {
+      totalMembers: await prisma.user.count({ where: { role: 'MEMBER', isActive: true } }),
+      totalSermons: await prisma.sermon.count({ where: { isPublished: true } }),
+      totalEvents: await prisma.event.count({ where: { isPublished: true } }),
+      totalPrayerRequests: await prisma.prayerRequest.count()
+    }
 
     return NextResponse.json({
-      recentSermons,
-      upcomingEvents,
-      recentPosts,
-      stats: {
-        totalMembers,
-        totalSermons,
-        totalEvents,
-        totalPrayerRequests
-      }
+      recentSermons: recentSermons.map(sermon => ({
+        ...sermon,
+        date: sermon.date.toISOString(),
+        // Add placeholder image if not available
+        imageUrl: null // Will use default in component
+      })),
+      upcomingEvents: upcomingEvents.map(event => ({
+        ...event,
+        startDate: event.startDate.toISOString()
+      })),
+      recentPosts: recentPosts.map(post => ({
+        ...post,
+        publishDate: post.publishDate?.toISOString() || post.createdAt.toISOString()
+      })),
+      stats
     })
   } catch (error) {
     console.error('Error fetching homepage data:', error)
-    return NextResponse.json({
+    return NextResponse.json({ 
       recentSermons: [],
       upcomingEvents: [],
       recentPosts: [],
@@ -90,6 +93,6 @@ export async function GET() {
         totalEvents: 0,
         totalPrayerRequests: 0
       }
-    })
+    }, { status: 500 })
   }
 }

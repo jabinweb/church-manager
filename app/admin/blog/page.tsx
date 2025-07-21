@@ -19,6 +19,7 @@ import {
   Loader2
 } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface BlogPost {
   id: string
@@ -29,6 +30,7 @@ interface BlogPost {
   publishDate: string | null
   views: number
   tags: string[]
+  imageUrl?: string | null
   createdAt: string
   author: {
     name: string | null
@@ -223,7 +225,6 @@ export default function BlogPage() {
             </div>
           ) : filteredPosts.length === 0 ? (
             <div className="text-center py-8">
-              <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500">
                 {safeBlogPosts.length === 0 ? 'No blog posts found' : 'No posts match your search criteria'}
               </p>
@@ -241,8 +242,20 @@ export default function BlogPage() {
               {filteredPosts.map((post) => (
                 <div key={post.id} className="flex items-start justify-between p-6 border rounded-lg hover:bg-gray-50">
                   <div className="flex items-start space-x-4 flex-1">
-                    <div className="w-16 h-16 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <MessageSquare className="h-8 w-8 text-purple-600" />
+                    <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100">
+                      {post.imageUrl ? (
+                        <Image
+                          src={post.imageUrl}
+                          alt={post.title}
+                          width={64}
+                          height={64}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-purple-100 flex items-center justify-center">
+                          <MessageSquare className="h-8 w-8 text-purple-600" />
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">

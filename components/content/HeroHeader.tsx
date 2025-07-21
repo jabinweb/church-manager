@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { ArrowLeftIcon, CalendarIcon, ClockIcon, CommentIcon } from '@/components/icons'
+import { ArrowLeftIcon, CalendarIcon, ClockIcon, CommentIcon } from '@/components/layout/icons'
 import { useRouter } from 'next/navigation'
 
 interface Author {

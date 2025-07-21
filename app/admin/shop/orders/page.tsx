@@ -103,7 +103,7 @@ export default function AdminOrdersPage() {
       if (search) params.append('search', search)
       if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter)
 
-      const response = await fetch(`/api/admin/orders?${params}`)
+      const response = await fetch(`/api/admin/shop/orders?${params}`)
       const data = await response.json()
       
       // Ensure orders is always an array
@@ -145,7 +145,7 @@ export default function AdminOrdersPage() {
 
     setBulkActionLoading(true)
     try {
-      const response = await fetch('/api/admin/orders/bulk', {
+      const response = await fetch('/api/admin/shop/orders/bulk', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -168,7 +168,7 @@ export default function AdminOrdersPage() {
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     try {
-      const response = await fetch(`/api/admin/orders/${orderId}`, {
+      const response = await fetch(`/api/admin/shop/orders/${orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -301,7 +301,7 @@ export default function AdminOrdersPage() {
               {loading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="relative">
-                    <div className="w-16 h-16 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin"></div>
+                    {/* <div className="w-16 h-16 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin"></div> */}
                     <div className="w-10 h-10 border-4 border-gray-100 border-t-purple-500 rounded-full animate-spin absolute top-1 left-1"></div>
                   </div>
                 </div>
@@ -410,7 +410,7 @@ export default function AdminOrdersPage() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-48">
                                   <DropdownMenuItem asChild>
-                                    <Link href={`/admin/orders/${order.id}`} className="flex items-center">
+                                    <Link href={`/shop/orders/${order.id}`} className="flex items-center">
                                       <Eye className="h-4 w-4 mr-2" />
                                       View Details
                                     </Link>

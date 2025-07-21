@@ -13,7 +13,7 @@ import {
   MapPinIcon,
   HeartIcon,
   ChurchIcon
-} from '@/components/icons'
+} from '@/components/layout/icons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 

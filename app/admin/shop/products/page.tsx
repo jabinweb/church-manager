@@ -61,7 +61,7 @@ export default function AdminProductsPage() {
         params.append('search', search.trim())
       }
 
-      const response = await fetch(`/api/admin/products?${params}`)
+      const response = await fetch(`/api/admin/shop/products?${params}`)
       if (!response.ok) {
         throw new Error('Failed to fetch products')
       }
@@ -120,7 +120,7 @@ export default function AdminProductsPage() {
 
     setBulkActionLoading(true)
     try {
-      const response = await fetch('/api/admin/products/bulk', {
+      const response = await fetch('/api/admin/shop/products/bulk', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -145,7 +145,7 @@ export default function AdminProductsPage() {
     if (!confirm('Are you sure you want to delete this product?')) return
 
     try {
-      const response = await fetch(`/api/admin/products/${productId}`, {
+      const response = await fetch(`/api/admin/shop/products/${productId}`, {
         method: 'DELETE'
       })
 
@@ -178,7 +178,7 @@ export default function AdminProductsPage() {
           <p className="text-gray-600">Manage your product catalog</p>
         </div>
         <Button asChild className="bg-purple-600 hover:bg-purple-700">
-          <Link href="/admin/products/new">
+          <Link href="/admin/shop/products/new">
             <Plus className="h-4 w-4 mr-2" />
             Add Product
           </Link>
@@ -412,7 +412,7 @@ export default function AdminProductsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem asChild>
-                            <Link href={`/admin/products/${product.id}/edit`}>
+                            <Link href={`/admin/shop/products/${product.id}/edit`}>
                               <Edit className="h-4 w-4 mr-2" />
                               Edit
                             </Link>

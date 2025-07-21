@@ -8,18 +8,19 @@ import { toast } from 'sonner'
 interface Product {
   id: string
   name: string
-  description: string
+  description: string | null
   price: number
-  discount: number
-  images: string[]
-  stock: number
-  sku: string
+  sku: string | null
+  slug: string | null
+  imageUrl: string | null
+  stockQuantity: number
   isActive: boolean
-  categoryId: string
-  category: {
+  categoryId: string | null
+  tags: string[]
+  category?: {
     id: string
     name: string
-  }
+  } | null
 }
 
 export default function EditProductPage() {
@@ -35,14 +36,24 @@ export default function EditProductPage() {
 
   const fetchProduct = async (id: string) => {
     try {
-      const response = await fetch(`/api/admin/products/${id}`)
+      const response = await fetch(`/api/admin/shop/products/${id}`)
       if (!response.ok) throw new Error('Product not found')
       
       const data = await response.json()
       // Transform the data to match the form's expected structure
       const transformedProduct = {
-        ...data,
-        categoryId: data.category.id
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        price: Number(data.price),
+        sku: data.sku,
+        slug: data.slug,
+        imageUrl: data.imageUrl,
+        stockQuantity: data.stockQuantity,
+        isActive: data.isActive,
+        categoryId: data.categoryId,
+        tags: data.tags || [],
+        category: data.category
       }
       setProduct(transformedProduct)
     } catch (error) {

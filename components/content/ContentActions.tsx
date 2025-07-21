@@ -10,7 +10,7 @@ import {
   TwitterIcon, 
   LinkedInIcon,
   ArrowLeftIcon
-} from '@/components/icons'
+} from '@/components/layout/icons'
 import { 
   Tooltip, 
   TooltipContent, 

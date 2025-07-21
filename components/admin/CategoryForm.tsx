@@ -16,8 +16,8 @@ import Image from 'next/image'
 interface Category {
   id?: string
   name: string
-  description: string
-  image: string | null
+  description: string | null
+  imageUrl: string | null
   isActive: boolean
 }
 
@@ -30,8 +30,8 @@ export function CategoryForm({ category }: CategoryFormProps) {
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState<Category>({
     name: '',
-    description: '',
-    image: null,
+    description: null,
+    imageUrl: null,
     isActive: true,
     ...category
   })
@@ -46,21 +46,27 @@ export function CategoryForm({ category }: CategoryFormProps) {
 
     // Mock image upload - replace with actual upload logic
     const imageUrl = URL.createObjectURL(file)
-    setFormData(prev => ({ ...prev, image: imageUrl }))
+    setFormData(prev => ({ ...prev, imageUrl }))
   }
 
   const removeImage = () => {
-    setFormData(prev => ({ ...prev, image: null }))
+    setFormData(prev => ({ ...prev, imageUrl: null }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!formData.name.trim()) {
+      toast.error('Category name is required')
+      return
+    }
+
     setLoading(true)
 
     try {
       const url = category 
-        ? `/api/admin/categories/${category.id}` 
-        : '/api/admin/categories'
+        ? `/api/admin/shop/categories/${category.id}` 
+        : '/api/admin/shop/categories'
       
       const method = category ? 'PUT' : 'POST'
 
@@ -70,12 +76,16 @@ export function CategoryForm({ category }: CategoryFormProps) {
         body: JSON.stringify(formData)
       })
 
-      if (!response.ok) throw new Error('Failed to save category')
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save category')
+      }
 
       toast.success(`Category ${category ? 'updated' : 'created'} successfully`)
-      router.push('/admin/categories')
+      router.push('/admin/shop/categories')
     } catch (error) {
-      toast.error(`Failed to ${category ? 'update' : 'create'} category`)
+      console.error('Category save error:', error)
+      toast.error(error instanceof Error ? error.message : `Failed to ${category ? 'update' : 'create'} category`)
     } finally {
       setLoading(false)
     }
@@ -85,7 +95,7 @@ export function CategoryForm({ category }: CategoryFormProps) {
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="flex items-center justify-between">
         <Button variant="ghost" asChild>
-          <Link href="/admin/categories">
+          <Link href="/admin/shop/categories">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Categories
           </Link>
@@ -116,8 +126,8 @@ export function CategoryForm({ category }: CategoryFormProps) {
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
-                value={formData.description}
-                onChange={(e) => handleInputChange('description', e.target.value)}
+                value={formData.description || ''}
+                onChange={(e) => handleInputChange('description', e.target.value || null)}
                 rows={4}
                 placeholder="Describe this category..."
               />
@@ -159,10 +169,10 @@ export function CategoryForm({ category }: CategoryFormProps) {
                 />
               </div>
 
-              {formData.image && (
+              {formData.imageUrl && (
                 <div className="relative group">
                   <Image
-                    src={formData.image}
+                    src={formData.imageUrl}
                     alt="Category image"
                     width={200}
                     height={200}

@@ -5,7 +5,7 @@ import { format } from 'date-fns'
 import Image from 'next/image'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { CommentIcon, ClockIcon } from '@/components/icons'
+import { CommentIcon, ClockIcon } from '@/components/layout/icons'
 import { useMemo, useCallback } from 'react'
 
 // Base interface with minimal required properties

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { toast } from 'sonner'
-import { CommentIcon, ArrowLeftIcon } from '@/components/icons'
+import { CommentIcon, ArrowLeftIcon } from '@/components/layout/icons'
 
 // Import shared components
 import HeroHeader from '@/components/content/HeroHeader'

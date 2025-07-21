@@ -33,10 +33,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { CalendarIcon, Loader2, Eye, Code, Save, ArrowLeft } from 'lucide-react'
+import { CalendarIcon, Loader2, Eye, Code, Save, ArrowLeft, ImageIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Editor } from '@/components/editor'
+import { Editor } from '@/components/content/editor'
 import ImageUpload from '@/components/admin/ImageUpload'
+import MediaSelector from '@/components/admin/MediaSelector'
 
 // Define the blog post schema for validation
 const blogPostSchema = z.object({
@@ -71,6 +72,7 @@ export default function BlogPostForm({ postId }: BlogPostFormProps) {
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoadingCategories, setIsLoadingCategories] = useState(true)
   const [activeTab, setActiveTab] = useState('edit')
+  const [showMediaSelector, setShowMediaSelector] = useState(false)
   const isEditing = !!postId
 
   // Initialize form with default values
@@ -217,6 +219,35 @@ export default function BlogPostForm({ postId }: BlogPostFormProps) {
     form.setValue('imageUrl', url)
   }
 
+  // Handle media insertion into content
+  const handleMediaInsert = (file: any) => {
+    if (!file.url) return
+
+    const currentContent = form.getValues('content')
+    let mediaHtml = ''
+
+    if (file.mimeType?.startsWith('image/')) {
+      mediaHtml = `<img src="${file.url}" alt="${file.name}" style="max-width: 100%; height: auto;" />`
+    } else if (file.mimeType?.startsWith('video/')) {
+      mediaHtml = `<video controls style="max-width: 100%; height: auto;">
+        <source src="${file.url}" type="${file.mimeType}" />
+        Your browser does not support the video tag.
+      </video>`
+    } else if (file.mimeType?.startsWith('audio/')) {
+      mediaHtml = `<audio controls style="width: 100%;">
+        <source src="${file.url}" type="${file.mimeType}" />
+        Your browser does not support the audio tag.
+      </audio>`
+    } else {
+      mediaHtml = `<a href="${file.url}" target="_blank" rel="noopener noreferrer">${file.name}</a>`
+    }
+
+    const newContent = currentContent + '\n\n' + mediaHtml + '\n\n'
+    form.setValue('content', newContent)
+    handleContentChange(newContent)
+    setShowMediaSelector(false)
+  }
+
   return (
     <div className="mx-auto md:p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -316,16 +347,28 @@ export default function BlogPostForm({ postId }: BlogPostFormProps) {
                   <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <div className="flex items-center justify-between px-6 pt-6">
                       <h3 className="text-lg font-semibold">Content</h3>
-                      <TabsList>
-                        <TabsTrigger value="edit" onClick={() => setActiveTab('edit')}>
-                          <Code size={16} className="mr-2" />
-                          Edit
-                        </TabsTrigger>
-                        <TabsTrigger value="preview" onClick={() => setActiveTab('preview')}>
-                          <Eye size={16} className="mr-2" />
-                          Preview
-                        </TabsTrigger>
-                      </TabsList>
+                      <div className="flex items-center space-x-2">
+                        <MediaSelector
+                          onSelect={handleMediaInsert}
+                          allowedTypes={['image/*', 'video/*', 'audio/*']}
+                        >
+                          <Button type="button" variant="outline" size="sm">
+                            <ImageIcon className="h-4 w-4 mr-2" />
+                            Insert Media
+                          </Button>
+                        </MediaSelector>
+                        
+                        <TabsList>
+                          <TabsTrigger value="edit" onClick={() => setActiveTab('edit')}>
+                            <Code size={16} className="mr-2" />
+                            Edit
+                          </TabsTrigger>
+                          <TabsTrigger value="preview" onClick={() => setActiveTab('preview')}>
+                            <Eye size={16} className="mr-2" />
+                            Preview
+                          </TabsTrigger>
+                        </TabsList>
+                      </div>
                     </div>
                     
                     <CardContent className="pt-4">

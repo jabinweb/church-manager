@@ -4,143 +4,295 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { toast } from 'sonner'
-import { Loader2, Upload, X, Image as ImageIcon, Link as LinkIcon } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog'
+import { ImageIcon, Upload, X, Folder, Link, Check } from 'lucide-react'
 import Image from 'next/image'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import ImageOptimizer from './ImageOptimizer'
+import { toast } from 'sonner'
+import MediaSelector from './MediaSelector'
 
 interface ImageUploadProps {
   value: string
-  onChange: (url: string) => void
+  onChange: (value: string) => void
   onRemove: () => void
-  disabled?: boolean
 }
 
 export default function ImageUpload({
   value,
   onChange,
-  onRemove,
-  disabled
+  onRemove
 }: ImageUploadProps) {
-  const [isUploading, setIsUploading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'upload' | 'url'>('upload')
+  const [uploading, setUploading] = useState(false)
+  const [urlDialogOpen, setUrlDialogOpen] = useState(false)
+  const [tempUrl, setTempUrl] = useState('')
+  const [urlError, setUrlError] = useState('')
 
-  // Handle direct file upload (legacy method)
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    
-    if (!file) return
-    
-    // Basic validation
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file')
-      return
-    }
-    
-    // Max size 5MB
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be less than 5MB')
-      return
-    }
-    
-    setIsUploading(true)
-    
+  const handleFileUpload = async (file: File) => {
+    setUploading(true)
     try {
       const formData = new FormData()
-      formData.append('image', file)
-      
+      formData.append('file', file)
+      formData.append('type', 'blog-image')
+
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData
       })
-      
-      if (!response.ok) {
+
+      if (response.ok) {
+        const data = await response.json()
+        onChange(data.url)
+        toast.success('Image uploaded successfully')
+      } else {
         throw new Error('Upload failed')
       }
-      
-      const data = await response.json()
-      onChange(data.url)
-      toast.success('Image uploaded successfully')
     } catch (error) {
-      console.error('Error uploading image:', error)
+      console.error('Upload error:', error)
       toast.error('Failed to upload image')
     } finally {
-      setIsUploading(false)
+      setUploading(false)
     }
   }
 
-  // Handle external URL input
-  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(e.target.value)
+  const handleMediaSelect = (file: any) => {
+    if (file.url) {
+      onChange(file.url)
+      toast.success('Image selected successfully')
+    } else {
+      onRemove()
+    }
+  }
+
+  const validateImageUrl = (url: string): boolean => {
+    // Basic URL validation
+    try {
+      new URL(url)
+      // Check if URL looks like an image (basic check)
+      const imageExtensions = [
+        '.jpg',
+        '.jpeg',
+        '.png',
+        '.gif',
+        '.webp',
+        '.svg'
+      ]
+      const lowerUrl = url.toLowerCase()
+      const hasImageExtension = imageExtensions.some(ext =>
+        lowerUrl.includes(ext)
+      )
+      const hasImageParam = lowerUrl.includes('image') || lowerUrl.includes('img')
+      const isValidImageUrl =
+        hasImageExtension ||
+        hasImageParam ||
+        lowerUrl.includes('blob:') ||
+        lowerUrl.includes('data:image')
+
+      return isValidImageUrl
+    } catch {
+      return false
+    }
+  }
+
+  const handleUrlSubmit = () => {
+    if (!tempUrl.trim()) {
+      setUrlError('Please enter a URL')
+      return
+    }
+
+    if (!validateImageUrl(tempUrl)) {
+      setUrlError('Please enter a valid image URL')
+      return
+    }
+
+    onChange(tempUrl.trim())
+    setTempUrl('')
+    setUrlError('')
+    setUrlDialogOpen(false)
+    toast.success('Image URL set successfully')
+  }
+
+  const openUrlDialog = () => {
+    setTempUrl(value || '')
+    setUrlError('')
+    setUrlDialogOpen(true)
   }
 
   return (
     <div className="space-y-4">
       {value ? (
-        <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-gray-200">
+        <div className="relative aspect-video w-full max-w-sm mx-auto group">
           <Image
             src={value}
-            alt="Uploaded image"
+            alt="Featured image"
             fill
-            className="object-cover"
+            className="object-contain rounded-lg"
+            onError={() => {
+              toast.error('Failed to load image')
+            }}
           />
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              type="button"
+              onClick={onRemove}
+              variant="destructive"
+              size="sm"
+              className="h-8 w-8 p-0"
+              title="Remove image"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="aspect-video w-full max-w-sm mx-auto border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+          <div className="text-center">
+            <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">No image selected</p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2 justify-center">
+        <input
+          type="file"
+          accept="image/*"
+          onChange={e => {
+            const file = e.target.files?.[0]
+            if (file) handleFileUpload(file)
+          }}
+          className="hidden"
+          id="image-upload"
+        />
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 w-8 p-0"
+          onClick={() => document.getElementById('image-upload')?.click()}
+          disabled={uploading}
+          title={uploading ? 'Uploading...' : 'Upload new image'}
+        >
+          <Upload className="h-4 w-4" />
+        </Button>
+
+        <MediaSelector
+          onSelect={handleMediaSelect}
+          selectedUrl={value}
+          allowedTypes={['image/*']}
+        >
           <Button
-            onClick={onRemove}
-            variant="destructive"
-            size="icon"
-            className="absolute right-2 top-2 h-7 w-7"
             type="button"
-            disabled={disabled}
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0"
+            title="Browse files"
+          >
+            <Folder className="h-4 w-4" />
+          </Button>
+        </MediaSelector>
+
+        <Dialog open={urlDialogOpen} onOpenChange={setUrlDialogOpen}>
+          <DialogTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={openUrlDialog}
+              title="Set image URL"
+            >
+              <Link className="h-4 w-4" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Set Image URL</DialogTitle>
+              <DialogDescription>
+                Enter a direct URL to an image
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="imageUrl">Image URL</Label>
+                <Input
+                  id="imageUrl"
+                  type="url"
+                  value={tempUrl}
+                  onChange={e => {
+                    setTempUrl(e.target.value)
+                    setUrlError('')
+                  }}
+                  placeholder="https://example.com/image.jpg"
+                  className={urlError ? 'border-red-500' : ''}
+                />
+                {urlError && (
+                  <p className="text-sm text-red-500 mt-1">{urlError}</p>
+                )}
+              </div>
+
+              {tempUrl && validateImageUrl(tempUrl) && (
+                <div className="border rounded-lg p-2">
+                  <Label className="text-sm text-gray-600 mb-2 block">
+                    Preview:
+                  </Label>
+                  <div className="relative aspect-video w-full max-w-xs">
+                    <Image
+                      src={tempUrl}
+                      alt="URL preview"
+                      fill
+                      className="object-contain rounded"
+                      onError={() =>
+                        setUrlError('Failed to load image from this URL')
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setUrlDialogOpen(false)
+                    setTempUrl('')
+                    setUrlError('')
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUrlSubmit}
+                  disabled={!tempUrl.trim() || !!urlError}
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Set URL
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {value && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={onRemove}
+            title="Remove image"
           >
             <X className="h-4 w-4" />
           </Button>
-        </div>
-      ) : (
-        <Tabs 
-          defaultValue="upload" 
-          value={activeTab}
-          onValueChange={(val) => setActiveTab(val as 'upload' | 'url')}
-        >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="upload">
-              <Upload className="h-4 w-4 mr-2" />
-              Upload
-            </TabsTrigger>
-            <TabsTrigger value="url">
-              <LinkIcon className="h-4 w-4 mr-2" />
-              External URL
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="upload" className="mt-4">
-            <ImageOptimizer
-              onImageOptimized={onChange}
-              maxSizeInMB={2}
-              maxWidthPx={1600}
-              defaultQuality={80}
-            />
-          </TabsContent>
-          
-          <TabsContent value="url" className="mt-4">
-            <div className="space-y-2">
-              <Label htmlFor="image-url">Image URL</Label>
-              <Input
-                id="image-url"
-                type="url"
-                placeholder="https://example.com/image.jpg"
-                onChange={handleUrlChange}
-                value={value}
-                className="max-w-md"
-                disabled={disabled}
-              />
-              <p className="text-sm text-gray-500">
-                Enter the URL of an existing image on the web
-              </p>
-            </div>
-          </TabsContent>
-        </Tabs>
-      )}
+        )}
+      </div>
     </div>
   )
 }
+
