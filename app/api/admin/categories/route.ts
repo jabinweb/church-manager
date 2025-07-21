@@ -23,7 +23,8 @@ export async function GET(request: NextRequest) {
       include: {
         _count: {
           select: {
-            products: true
+            sermons: true,
+            blogPosts: true
           }
         }
       },
@@ -51,13 +52,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, description, image, isActive } = body
+    const { name, description, imageUrl, isActive } = body
 
     const category = await prisma.category.create({
       data: {
         name,
         description,
-        image,
+        imageUrl,
         isActive
       }
     })

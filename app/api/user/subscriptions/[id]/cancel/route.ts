@@ -5,7 +5,7 @@ import { createRazorpayInstance } from '@/lib/razorpay'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
@@ -14,7 +14,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const subscriptionId = params.id
+    const subscriptionId = (await params).id
 
     // Find the donation record
     const donation = await prisma.donation.findFirst({

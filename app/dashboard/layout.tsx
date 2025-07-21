@@ -6,7 +6,6 @@ import { Suspense } from 'react'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
-  className?: string
 }
 
 function DashboardLoadingFallback() {
@@ -17,11 +16,11 @@ function DashboardLoadingFallback() {
   )
 }
 
-export default function DashboardLayout({ children, className }: DashboardLayoutProps) {
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex">
       <DashboardSidebar />
-      <main className={cn("flex-1 overflow-auto", className)}>
+      <main className={cn("flex-1 overflow-auto")}>
         <Suspense fallback={<DashboardLoadingFallback />}>
           {children}
         </Suspense>
@@ -29,4 +28,5 @@ export default function DashboardLayout({ children, className }: DashboardLayout
     </div>
   )
 }
+
   

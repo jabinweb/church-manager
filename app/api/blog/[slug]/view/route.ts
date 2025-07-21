@@ -3,9 +3,9 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(
   request: NextRequest,
-  context: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
-  const { slug } = context.params
+  const { slug } = await params
 
   try {
     const updatedPost = await prisma.blogPost.update({

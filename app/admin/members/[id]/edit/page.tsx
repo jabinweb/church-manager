@@ -88,12 +88,6 @@ export default function EditMemberPage() {
   const [newInterest, setNewInterest] = useState('')
   const [newMinistry, setNewMinistry] = useState('')
 
-  useEffect(() => {
-    if (memberId) {
-      fetchMember()
-    }
-  }, [memberId, fetchMember])
-
   const fetchMember = useCallback(async () => {
     try {
       setLoading(true)
@@ -128,6 +122,12 @@ export default function EditMemberPage() {
       setLoading(false)
     }
   }, [memberId])
+
+  useEffect(() => {
+    if (memberId) {
+      fetchMember()
+    }
+  }, [memberId, fetchMember])
 
   const handleSave = async () => {
     try {

@@ -3,9 +3,9 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(
   request: NextRequest,
-  context: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
-  const { slug } = context.params
+  const { slug } = await params
 
   try {
     // Only select fields that exist in the current schema

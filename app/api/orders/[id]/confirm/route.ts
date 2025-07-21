@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
-import { calculateCommissions } from '@/lib/commission'
+import { OrderStatus } from '@prisma/client'
 
 export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -30,27 +30,22 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       return NextResponse.json({ error: 'Order already processed' }, { status: 400 })
     }
 
-    // Update order status and calculate commissions in transaction
+    // Update order status
     const result = await prisma.$transaction(async (tx) => {
       // Update order status
       const updatedOrder = await tx.order.update({
         where: { id: orderId },
-        data: { status: 'PAID' }
+        data: { status: OrderStatus.PROCESSING }
       })
-
-      // Calculate and create commissions
-      const commissionResult = await calculateCommissions(orderId)
       
       return {
         order: updatedOrder,
-        commissions: commissionResult
       }
     })
 
     return NextResponse.json({
       success: true,
       order: result.order,
-      commissions: result.commissions
     })
 
   } catch (error) {

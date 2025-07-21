@@ -27,8 +27,7 @@ export async function GET(
               select: {
                 id: true,
                 name: true,
-                images: true,
-                discount: true,
+                imageUrl: true,
                 sku: true
               }
             }

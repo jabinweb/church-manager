@@ -25,6 +25,8 @@ interface Product {
     id: string
     name: string
   }
+  stockQuantity?: number // Add for cart compatibility
+  imageUrl?: string | null // Add for cart compatibility
 }
 
 export default function ProductDetailPage() {
@@ -66,7 +68,15 @@ export default function ProductDetailPage() {
     
     setAddingToCart(true)
     try {
-      const success = cartManager.addToCart(product, quantity)
+      // Map product fields to match cart manager expectations
+      const cartProduct = {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        imageUrl: product.images[0] || null,
+        stockQuantity: product.stock
+      }
+      const success = cartManager.addToCart(cartProduct, quantity)
       if (success) {
         toast.success(`${quantity} ${quantity === 1 ? 'item' : 'items'} added to cart!`)
       } else {
@@ -84,7 +94,15 @@ export default function ProductDetailPage() {
     
     setAddingToCart(true)
     try {
-      const success = cartManager.addToCart(product, quantity)
+      // Map product fields to match cart manager expectations
+      const cartProduct = {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        imageUrl: product.images[0] || null,
+        stockQuantity: product.stock
+      }
+      const success = cartManager.addToCart(cartProduct, quantity)
       if (success) {
         toast.success('Item added to cart!')
         router.push('/checkout')

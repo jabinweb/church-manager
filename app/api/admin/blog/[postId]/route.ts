@@ -5,8 +5,10 @@ import { prisma } from "@/lib/prisma"
 // GET handler for retrieving a specific blog post
 export async function GET(
   req: Request,
-  { params }: { params: { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
+  const { postId } = await params
+
   try {
     // Verify authentication and authorization
     const session = await auth()
@@ -21,13 +23,13 @@ export async function GET(
     }
     
     // Access postId from params safely
-    if (!params?.postId) {
+    if (!postId) {
       return NextResponse.json({ error: "Blog post ID is required" }, { status: 400 })
     }
     
     // Retrieve the blog post
     const post = await prisma.blogPost.findUnique({
-      where: { id: params.postId },
+      where: { id: postId },
       include: {
         author: {
           select: {
@@ -62,8 +64,10 @@ export async function GET(
 // PUT handler for updating a blog post
 export async function PUT(
   req: Request,
-  { params }: { params: { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
+  const { postId } = await params
+
   try {
     // Verify authentication and authorization
     const session = await auth()
@@ -78,7 +82,7 @@ export async function PUT(
     }
     
     // Safely access postId
-    if (!params?.postId) {
+    if (!postId) {
       return NextResponse.json({ error: "Blog post ID is required" }, { status: 400 })
     }
     
@@ -86,7 +90,7 @@ export async function PUT(
     
     // Check if blog post exists
     const existingPost = await prisma.blogPost.findUnique({
-      where: { id: params.postId },
+      where: { id: postId },
       select: { id: true, slug: true, authorId: true }
     })
     
@@ -135,7 +139,7 @@ export async function PUT(
     
     // Update the blog post
     const updatedPost = await prisma.blogPost.update({
-      where: { id: params.postId },
+      where: { id: postId },
       data: updateData,
       include: {
         author: {
@@ -167,8 +171,10 @@ export async function PUT(
 // DELETE handler for deleting a blog post
 export async function DELETE(
   req: Request,
-  { params }: { params: { postId: string } }
+  { params }: { params: Promise<{ postId: string }> }
 ) {
+  const { postId } = await params
+
   try {
     // Verify authentication and authorization
     const session = await auth()
@@ -178,13 +184,13 @@ export async function DELETE(
     }
     
     // Safely access postId
-    if (!params?.postId) {
+    if (!postId) {
       return NextResponse.json({ error: "Blog post ID is required" }, { status: 400 })
     }
     
     // Check if blog post exists
     const existingPost = await prisma.blogPost.findUnique({
-      where: { id: params.postId },
+      where: { id: postId },
       select: { id: true, authorId: true }
     })
     
@@ -205,7 +211,7 @@ export async function DELETE(
     
     // Delete the blog post
     await prisma.blogPost.delete({
-      where: { id: params.postId }
+      where: { id: postId }
     })
     
     return NextResponse.json({ success: true, message: "Blog post deleted successfully" })

@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
         where: {
           id: orderId,
           userId: session.user.id,
-          status: { in: ['PENDING', 'PAID'] } // Only allow cancellation for these statuses
+          status: { in: ['PENDING', 'PROCESSING'] } // Only allow cancellation for these statuses
         },
         include: {
           orderItems: true
@@ -42,34 +42,11 @@ export async function POST(request: NextRequest) {
         await tx.product.update({
           where: { id: item.productId },
           data: {
-            stock: {
+            stockQuantity: {
               increment: item.quantity
             }
           }
         })
-      }
-
-      // If order was paid, reverse commissions
-      if (order.status === 'PAID') {
-        await tx.commission.updateMany({
-          where: { orderId: order.id },
-          data: { status: 'CANCELLED' }
-        })
-
-        // Reverse wallet earnings (you may want to handle this differently)
-        const commissions = await tx.commission.findMany({
-          where: { orderId: order.id }
-        })
-
-        for (const commission of commissions) {
-          await tx.wallet.update({
-            where: { userId: commission.userId },
-            data: {
-              balance: { decrement: commission.amount },
-              totalEarnings: { decrement: commission.amount }
-            }
-          })
-        }
       }
 
       return updatedOrder
