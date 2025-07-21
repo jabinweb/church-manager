@@ -152,19 +152,19 @@ export default function Home() {
     {
       name: 'Sarah Johnson',
       role: 'Member since 2020',
-      content: 'Through this church, I&apos;ve experienced the transforming power of the Gospel firsthand. The community here truly lives out Christ&apos;s love.',
+      content: 'Through this church, I\'ve experienced the transforming power of the Gospel firsthand. The community here truly lives out Christ&apos;s love.',
       avatar: '/images/testimonial-1.jpg'
     },
     {
       name: 'Michael Chen',
       role: 'Youth Leader',
-      content: 'This church doesn&apos;t just preach the Gospel - they live it. I&apos;ve seen lives transformed by God&apos;s grace through this ministry.',
+      content: 'This church doesn\'t just preach the Gospel - they live it. I\'ve seen lives transformed by God\'s grace through this ministry.',
       avatar: '/images/testimonial-2.jpg'
     },
     {
       name: 'Emily Rodriguez',
       role: 'Small Group Leader',
-      content: 'The Gospel isn&apos;t just preached here on Sundays - it&apos;s lived out daily in how we care for one another.',
+      content: 'The Gospel isn\'t just preached here on Sundays - it\'s lived out daily in how we care for one another.',
       avatar: '/images/testimonial-3.jpg'
     }
   ]
@@ -239,7 +239,7 @@ export default function Home() {
       </section>
 
       {/* Stats Section - Improved Layout */}
-      <section className="py-12 bg-gradient-to-r from-purple-50 to-blue-50">
+      {/* <section className="py-12 bg-gradient-to-r from-purple-50 to-blue-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[
@@ -280,7 +280,7 @@ export default function Home() {
             ))}
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Recent Sermons - Better Typography */}
       {recentSermons.length > 0 && (
@@ -671,7 +671,7 @@ export default function Home() {
                         <Heart className="ml-2 h-4 w-4" />
                       </Link>
                     </Button>
-                    <Button size="lg" variant="outline" className="w-full border-white text-white hover:bg-white hover:text-purple-600" asChild>
+                    <Button size="lg" variant="outline" className="w-full border-white bg-transparent text-white hover:bg-white hover:text-purple-600" asChild>
                       <Link href="/giving">
                         Give Online
                         <HandHeart className="ml-2 h-4 w-4" />
