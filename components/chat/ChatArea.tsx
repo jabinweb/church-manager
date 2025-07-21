@@ -327,7 +327,7 @@ export function ChatArea({
         className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0 scroll-smooth"
         style={{ 
           height: 'calc(100vh - 140px)',
-          maxHeight: 'calc(100vh - 140px)',
+          maxHeight: 'calc(93vh - 200px)',
           scrollBehavior: 'smooth'
         }}
       >
