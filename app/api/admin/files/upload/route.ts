@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/prisma'
-import { writeFile, mkdir } from 'fs/promises'
-import { join } from 'path'
+import { put } from '@vercel/blob'
 import { v4 as uuidv4 } from 'uuid'
 
 export async function POST(request: NextRequest) {
@@ -22,44 +21,67 @@ export async function POST(request: NextRequest) {
     }
 
     const uploadedFiles = []
-    const uploadDir = join(process.cwd(), 'public', 'uploads')
-    
-    // Ensure upload directory exists
-    await mkdir(uploadDir, { recursive: true })
 
     for (const file of files) {
       if (file.size > 50 * 1024 * 1024) { // 50MB limit
         continue // Skip files that are too large
       }
 
-      const fileName = `${uuidv4()}-${file.name}`
-      const filePath = join(uploadDir, fileName)
-      const publicUrl = `/uploads/${fileName}`
+      // Generate unique filename with proper folder structure for Vercel Blob
+      const timestamp = Date.now()
+      const uuid = uuidv4()
       
-      // Write file to disk
-      const bytes = await file.arrayBuffer()
-      const buffer = new Uint8Array(bytes)
-      await writeFile(filePath, buffer)
+      // Convert database path to Vercel Blob path (remove leading slash, use forward slashes)
+      const blobPath = path === '/' ? '' : path.replace(/^\//, '') + '/'
+      const fileName = `${blobPath}${timestamp}-${uuid}-${file.name}`
+      
+      try {
+        // Upload to Vercel Blob with proper folder structure
+        const blob = await put(fileName, file, {
+          access: 'public'
+        })
 
-      // Save to database
-      const savedFile = await prisma.file.create({
-        data: {
-          name: file.name,
-          originalName: file.name,
-          fileName: fileName,
-          path: path,
-          url: publicUrl,
-          mimeType: file.type,
-          size: file.size,
-          uploadedById: session.user.id,
-          type: 'file',
-          isPublic: false,
-          tags: [],
-          metadata: {}
+        // Check if a file with this fileName already exists
+        const existingFile = await prisma.file.findUnique({
+          where: { fileName }
+        })
+
+        if (existingFile) {
+          console.log(`File with fileName ${fileName} already exists, skipping database save`)
+          continue
         }
-      })
 
-      uploadedFiles.push(savedFile)
+        // Save to database with original path structure
+        const savedFile = await prisma.file.create({
+          data: {
+            name: file.name,
+            originalName: file.name,
+            fileName: fileName,
+            path: path, // Keep the original path format for database
+            url: blob.url,
+            mimeType: file.type,
+            size: file.size,
+            uploadedById: session.user.id,
+            type: 'file',
+            isPublic: true,
+            tags: [],
+            metadata: {
+              blobUrl: blob.url,
+              pathname: blob.pathname,
+              blobPath: fileName // Store the actual blob path
+            }
+          }
+        })
+
+        uploadedFiles.push(savedFile)
+      } catch (uploadError: any) {
+        if (uploadError.code === 'P2002') {
+          console.log(`Duplicate fileName during upload: ${fileName}`)
+          continue
+        }
+        console.error('Error uploading file:', uploadError)
+        // Continue with other files
+      }
     }
 
     return NextResponse.json({ 
@@ -71,3 +93,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to upload files' }, { status: 500 })
   }
 }
+

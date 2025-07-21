@@ -1,78 +1,78 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { writeFile, mkdir } from 'fs/promises'
-import { join } from 'path'
-import { existsSync } from 'fs'
+import { put } from '@vercel/blob'
+import { v4 as uuidv4 } from 'uuid'
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const formData = await req.formData()
+    const formData = await request.formData()
     const file = formData.get('file') as File
     const type = formData.get('type') as string || 'general'
-
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 })
-    }
-
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json({ 
-        error: "Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed." 
-      }, { status: 400 })
-    }
-
-    // Validate file size (5MB limit)
-    const maxSize = 5 * 1024 * 1024 // 5MB
-    if (file.size > maxSize) {
-      return NextResponse.json({ 
-        error: "File too large. Maximum size is 5MB." 
-      }, { status: 400 })
-    }
-
-    // Create filename with timestamp
-    const timestamp = Date.now()
-    const fileExtension = file.name.split('.').pop()
-    const fileName = `${type}-${timestamp}.${fileExtension}`
-
-    // Create upload directory based on type
-    const uploadDir = join(process.cwd(), 'public', 'uploads', type)
     
-    // Ensure directory exists
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true })
+    if (!file) {
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    // Convert file to buffer
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
+    // Validate file size (10MB limit for general uploads)
+    const maxSize = 10 * 1024 * 1024
+    if (file.size > maxSize) {
+      return NextResponse.json({ error: 'File size exceeds 10MB limit' }, { status: 400 })
+    }
 
-    // Write file to disk
-    const filePath = join(uploadDir, fileName)
-    await writeFile(filePath, buffer)
+    // Validate file type based on upload type
+    const allowedTypes = {
+      'member-avatar': ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
+      'sermon-audio': ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg'],
+      'sermon-video': ['video/mp4', 'video/webm', 'video/ogg'],
+      'general': ['image/*', 'audio/*', 'video/*', 'application/pdf', 'text/*']
+    }
 
-    // Return the public URL
-    const publicUrl = `/uploads/${type}/${fileName}`
+    const typeKey = type as keyof typeof allowedTypes
+    if (typeKey !== 'general' && allowedTypes[typeKey]) {
+      const isValidType = allowedTypes[typeKey].some(allowedType => {
+        if (allowedType.endsWith('/*')) {
+          return file.type.startsWith(allowedType.replace('/*', '/'))
+        }
+        return file.type === allowedType
+      })
 
-    return NextResponse.json({ 
-      url: publicUrl,
-      filename: fileName,
-      size: file.size,
-      type: file.type,
-      message: "File uploaded successfully"
-    })
+      if (!isValidType) {
+        return NextResponse.json({ 
+          error: `Invalid file type for ${type}. Allowed types: ${allowedTypes[typeKey].join(', ')}` 
+        }, { status: 400 })
+      }
+    }
+
+    // Generate unique filename
+    const fileExtension = file.name.split('.').pop()
+    const uniqueFileName = `${type}/${uuidv4()}.${fileExtension}`
+    
+    try {
+      // Upload to Vercel Blob
+      const blob = await put(uniqueFileName, file, {
+        access: 'public'
+      })
+
+      return NextResponse.json({
+        success: true,
+        url: blob.url,
+        downloadUrl: blob.pathname,
+        filename: uniqueFileName
+      })
+    } catch (uploadError) {
+      console.error('Blob upload error:', uploadError)
+      return NextResponse.json({ error: 'Failed to upload to storage' }, { status: 500 })
+    }
 
   } catch (error) {
     console.error('Upload error:', error)
-    return NextResponse.json({ 
-      error: "Failed to upload file" 
-    }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to process upload' }, { status: 500 })
   }
 }
 
@@ -84,5 +84,4 @@ export const config = {
     },
   },
 }
-    
-  
+

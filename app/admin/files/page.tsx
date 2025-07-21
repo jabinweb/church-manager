@@ -33,7 +33,8 @@ import {
   Loader2,
   ArrowLeft,
   Folder,
-  Archive
+  Archive,
+  RefreshCw
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useDropzone } from 'react-dropzone'
@@ -68,6 +69,15 @@ interface FileStats {
   recentUploads: number
   publicFiles: number
   privateFiles: number
+  blobCount?: number
+  blobSize?: number
+  syncStatus?: {
+    lastSync: string
+    dbFiles: number
+    blobFiles: number
+    inSync: boolean
+    sizeDifference: number
+  }
 }
 
 export default function FileManagementPage() {
@@ -83,18 +93,26 @@ export default function FileManagementPage() {
   const [createFolderOpen, setCreateFolderOpen] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [lastSync, setLastSync] = useState<string | null>(null)
   const [renameDialogOpen, setRenameDialogOpen] = useState(false)
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null)
   const [newFileName, setNewFileName] = useState('')
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false)
 
-  const fetchFiles = useCallback(async () => {
+  const fetchFiles = useCallback(async (forceSync = false) => {
     try {
-      const response = await fetch(`/api/admin/files?path=${encodeURIComponent(currentPath)}`)
+      console.log('Fetching files for path:', currentPath)
+      const syncParam = forceSync ? '&sync=true' : ''
+      const response = await fetch(`/api/admin/files?path=${encodeURIComponent(currentPath)}${syncParam}`)
       if (response.ok) {
         const data = await response.json()
+        console.log('Fetched files:', data.files.length, data.files)
         setFiles(data.files || [])
+        if (forceSync) {
+          setLastSync(new Date().toISOString())
+        }
       }
     } catch (error) {
       console.error('Error fetching files:', error)
@@ -161,23 +179,28 @@ export default function FileManagementPage() {
   const createFolder = async () => {
     if (!newFolderName.trim()) return
 
+    console.log('Creating folder:', { name: newFolderName, path: currentPath })
+
     try {
       const response = await fetch('/api/admin/files/folder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: newFolderName,
-          path: currentPath
+          path: currentPath // Send the current path where folder should be created
         })
       })
 
       if (response.ok) {
+        const result = await response.json()
+        console.log('Folder created:', result)
         toast.success('Folder created successfully')
         setNewFolderName('')
         setCreateFolderOpen(false)
-        fetchFiles()
+        fetchFiles() // Refresh the file list
       } else {
         const error = await response.json()
+        console.error('Folder creation error:', error)
         toast.error(error.error || 'Failed to create folder')
       }
     } catch (error) {
@@ -389,6 +412,7 @@ export default function FileManagementPage() {
   })
 
   const navigateToFolder = (folderId: string, folderName: string) => {
+    // Build the new path by appending the folder name to current path
     const newPath = currentPath === '/' ? `/${folderName}` : `${currentPath}/${folderName}`
     setCurrentPath(newPath)
   }
@@ -398,6 +422,41 @@ export default function FileManagementPage() {
     if (pathParts.length > 0) {
       pathParts.pop()
       setCurrentPath(pathParts.length === 0 ? '/' : '/' + pathParts.join('/'))
+    }
+  }
+
+  const performSync = async () => {
+    setSyncing(true)
+    try {
+      const response = await fetch('/api/admin/files/sync', {
+        method: 'POST'
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        const { added, updated, removed, skipped, timeout, message } = data.syncResult
+        
+        if (timeout) {
+          toast.warning(message || 'Sync timeout - showing database files only')
+        } else {
+          let successMessage = `Sync completed: ${added} added, ${updated} updated, ${removed} removed`
+          if (skipped > 0) {
+            successMessage += `, ${skipped} skipped`
+          }
+          toast.success(successMessage)
+        }
+        
+        setLastSync(new Date().toISOString())
+        fetchFiles(true) // Force sync after manual sync
+        fetchStats()
+      } else {
+        throw new Error('Sync failed')
+      }
+    } catch (error) {
+      console.error('Sync error:', error)
+      toast.error('Failed to sync with cloud storage - showing database files only')
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -418,6 +477,31 @@ export default function FileManagementPage() {
               <p className="text-gray-600 mt-2">Manage your organization&apos;s files and media assets</p>
             </div>
             <div className="flex items-center space-x-3">
+              <Button 
+                variant="outline" 
+                onClick={performSync} 
+                disabled={syncing}
+                className="bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+              >
+                {syncing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Sync Now
+                  </>
+                )}
+              </Button>
+              
+              {lastSync && (
+                <span className="text-xs text-gray-500">
+                  Last sync: {format(new Date(lastSync), 'HH:mm:ss')}
+                </span>
+              )}
+
               <Dialog open={createFolderOpen} onOpenChange={setCreateFolderOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline">
@@ -512,6 +596,11 @@ export default function FileManagementPage() {
                   <div>
                     <p className="text-blue-100 text-sm font-medium">Total Files</p>
                     <p className="text-3xl font-bold">{stats.totalFiles}</p>
+                    {stats.blobCount !== undefined && (
+                      <p className="text-blue-200 text-xs">
+                        Blob: {typeof stats.blobCount === 'number' ? stats.blobCount : 'Unavailable'}
+                      </p>
+                    )}
                   </div>
                   <File className="h-8 w-8 text-blue-200" />
                 </div>
@@ -524,6 +613,11 @@ export default function FileManagementPage() {
                   <div>
                     <p className="text-green-100 text-sm font-medium">Storage Used</p>
                     <p className="text-3xl font-bold">{formatFileSize(stats.totalSize)}</p>
+                    {stats.blobSize !== undefined && (
+                      <p className="text-green-200 text-xs">
+                        Blob: {formatFileSize(stats.blobSize)} {stats.syncStatus?.error && '(Unavailable)'}
+                      </p>
+                    )}
                   </div>
                   <HardDrive className="h-8 w-8 text-green-200" />
                 </div>
@@ -536,6 +630,11 @@ export default function FileManagementPage() {
                   <div>
                     <p className="text-purple-100 text-sm font-medium">Folders</p>
                     <p className="text-3xl font-bold">{stats.totalFolders}</p>
+                    {stats.syncStatus && (
+                      <p className={`text-xs ${stats.syncStatus.inSync ? 'text-purple-200' : 'text-yellow-200'}`}>
+                        {stats.syncStatus.error ? 'Sync Error' : stats.syncStatus.inSync ? 'In Sync' : 'Sync Needed'}
+                      </p>
+                    )}
                   </div>
                   <Folder className="h-8 w-8 text-purple-200" />
                 </div>
