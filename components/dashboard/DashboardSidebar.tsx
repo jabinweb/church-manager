@@ -17,8 +17,12 @@ import {
   BarChart3,
   Settings,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Menu,
+  X,
+  MessageCircle
 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 interface SidebarItem {
   title: string
@@ -27,7 +31,12 @@ interface SidebarItem {
   children?: SidebarItem[]
 }
 
-export function DashboardSidebar() {
+interface DashboardSidebarProps {
+  isMobileOpen: boolean
+  setIsMobileOpen: (open: boolean) => void
+}
+
+export function DashboardSidebar({ isMobileOpen, setIsMobileOpen }: DashboardSidebarProps) {
   const pathname = usePathname()
   const { data: session } = useSession()
   const [expandedItems, setExpandedItems] = useState<string[]>([])
@@ -43,6 +52,11 @@ export function DashboardSidebar() {
       title: 'Dashboard',
       href: '/dashboard',
       icon: LayoutDashboard,
+    },
+    {
+      title: 'Messages',
+      href: '/dashboard/messages',
+      icon: MessageCircle,
     },
     {
       title: 'My Profile',
@@ -104,32 +118,42 @@ export function DashboardSidebar() {
     return children.some(child => isActive(child.href))
   }
 
+  const handleLinkClick = () => {
+    // Close mobile menu when a link is clicked
+    setIsMobileOpen(false)
+  }
+
   // Prevent hydration mismatch by not rendering until mounted
   if (!mounted) {
     return (
-      <motion.div 
-        className="bg-white/80 backdrop-blur-sm border-r border-gray-200 h-full w-64 flex-shrink-0"
-      >
+      <div className="hidden lg:flex bg-white/80 backdrop-blur-sm border-r border-gray-200 h-full w-64 flex-shrink-0">
         <div className="p-4">
           <div className="mb-8">
             <h2 className="text-xl font-bold text-gray-900">Dashboard</h2>
             <p className="text-sm text-gray-600">Member Portal</p>
           </div>
         </div>
-      </motion.div>
+      </div>
     )
   }
 
-  return (
-    <motion.div 
-      initial={{ x: -100, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      className="bg-white/80 backdrop-blur-sm border-r border-gray-200 h-screen flex-shrink-0 w-64 flex flex-col"
-    >
+  const SidebarContent = () => (
+    <>
       <div className="p-4 flex-shrink-0">
-        <div className="mb-8">
-          <h2 className="text-xl font-bold text-gray-900">Dashboard</h2>
-          <p className="text-sm text-gray-600">Member Portal</p>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Dashboard</h2>
+            <p className="text-sm text-gray-600">Member Portal</p>
+          </div>
+          {/* Close button for mobile */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="lg:hidden"
+            onClick={() => setIsMobileOpen(false)}
+          >
+            <X className="h-5 w-5" />
+          </Button>
         </div>
       </div>
 
@@ -146,6 +170,7 @@ export function DashboardSidebar() {
                 <div className="flex items-center">
                   <Link
                     href={item.href}
+                    onClick={handleLinkClick}
                     className={cn(
                       'flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex-1',
                       isItemActive || hasActiveChildren
@@ -183,6 +208,7 @@ export function DashboardSidebar() {
                         <Link
                           key={child.href}
                           href={child.href}
+                          onClick={handleLinkClick}
                           className={cn(
                             'flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition-colors',
                             isActive(child.href)
@@ -202,6 +228,64 @@ export function DashboardSidebar() {
           })}
         </nav>
       </div>
-    </motion.div>
+    </>
+  )
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <motion.div 
+        initial={{ x: -100, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        className="hidden lg:flex bg-white/80 backdrop-blur-sm border-r border-gray-200 h-screen flex-shrink-0 w-64 flex-col"
+      >
+        <SidebarContent />
+      </motion.div>
+
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {isMobileOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="lg:hidden fixed inset-0 z-50 bg-black/50"
+            onClick={() => setIsMobileOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Sidebar */}
+      <AnimatePresence>
+        {isMobileOpen && (
+          <motion.div
+            initial={{ x: -300 }}
+            animate={{ x: 0 }}
+            exit={{ x: -300 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="lg:hidden fixed left-0 top-0 bottom-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col"
+          >
+            <SidebarContent />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  )
+}
+
+// Mobile Header Component
+export function MobileHeader({ onMenuClick }: { onMenuClick: () => void }) {
+  return (
+    <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onMenuClick}
+      >
+        <Menu className="h-5 w-5" />
+      </Button>
+      <h1 className="text-lg font-semibold text-gray-900">Dashboard</h1>
+      <div className="w-8" /> {/* Spacer for centering */}
+    </div>
   )
 }

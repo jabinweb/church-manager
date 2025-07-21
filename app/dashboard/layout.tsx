@@ -1,6 +1,7 @@
 'use client'
 
-import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar'
+import { useState } from 'react'
+import { DashboardSidebar, MobileHeader } from '@/components/dashboard/DashboardSidebar'
 import { cn } from '@/lib/utils'
 import { Suspense } from 'react'
 
@@ -17,16 +18,30 @@ function DashboardLoadingFallback() {
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex">
-      <DashboardSidebar />
-      <main className={cn("flex-1 overflow-auto")}>
-        <Suspense fallback={<DashboardLoadingFallback />}>
-          {children}
-        </Suspense>
-      </main>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
+      {/* Mobile Header */}
+      <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
+      
+      <div className="flex">
+        {/* Sidebar */}
+        <DashboardSidebar 
+          isMobileOpen={isMobileMenuOpen} 
+          setIsMobileOpen={setIsMobileMenuOpen} 
+        />
+        
+        {/* Main Content */}
+        <main className={cn("flex-1 overflow-auto min-h-screen lg:min-h-0")}>
+          <Suspense fallback={<DashboardLoadingFallback />}>
+            <div className="p-4 lg:p-6">
+              {children}
+            </div>
+          </Suspense>
+        </main>
+      </div>
     </div>
   )
 }
 
-  
