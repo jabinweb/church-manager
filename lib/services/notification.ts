@@ -60,26 +60,41 @@ export class NotificationService {
       console.warn('AudioContext not supported:', error)
     }
 
-    // Track window focus
+    // Track window focus more reliably
     this.trackWindowFocus()
   }
 
   private trackWindowFocus() {
     const handleFocus = () => {
+      console.log('Window focused')
       this.isWindowFocused = true
     }
     
     const handleBlur = () => {
+      console.log('Window blurred')
       this.isWindowFocused = false
     }
 
+    const handleVisibilityChange = () => {
+      const isVisible = !document.hidden
+      console.log('Visibility changed:', isVisible)
+      this.isWindowFocused = isVisible && document.hasFocus()
+    }
+
+    // Use multiple event listeners for better detection
     window.addEventListener('focus', handleFocus)
     window.addEventListener('blur', handleBlur)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    // Set initial state
+    this.isWindowFocused = !document.hidden && document.hasFocus()
+    console.log('Initial window focus state:', this.isWindowFocused)
 
-    // Cleanup function (could be called from a cleanup method)
+    // Cleanup function
     return () => {
       window.removeEventListener('focus', handleFocus)
       window.removeEventListener('blur', handleBlur)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }
 
@@ -125,9 +140,9 @@ export class NotificationService {
     console.log('Permission:', this.permission)
     console.log('Sound enabled:', this.soundEnabled)
     
-    // Don't show notification if window is focused (unless explicitly requested)
+    // Show notification if window is not focused OR if explicitly requested
     if (this.isWindowFocused && !options.requireInteraction) {
-      console.log('Skipping notification - window is focused')
+      console.log('Skipping notification - window is focused and not required')
       return null
     }
 
@@ -145,7 +160,7 @@ export class NotificationService {
         badge: options.badge || '/favicon.ico',
         tag: options.tag,
         requireInteraction: options.requireInteraction || false,
-        silent: options.silent || false,
+        silent: false, // Always set to false so we can control sound manually
         data: options.data
       } as any
 
@@ -165,13 +180,17 @@ export class NotificationService {
       // Play notification sound if enabled and not silent
       if (this.soundEnabled && !options.silent) {
         console.log('Playing notification sound')
-        this.playNotificationSound()
+        // Use setTimeout to ensure audio context is ready
+        setTimeout(() => {
+          this.playNotificationSound()
+        }, 100)
       }
 
       // Set up event handlers
       if (options.onClick) {
-        notification.onclick = () => {
+        notification.onclick = (event) => {
           console.log('Notification clicked')
+          event.preventDefault()
           window.focus()
           options.onClick?.()
           notification.close()
@@ -206,7 +225,35 @@ export class NotificationService {
   }
 
   public playNotificationSound(options: NotificationSoundOptions = {}): void {
-    if (!this.audioContext || !this.soundEnabled) return
+    console.log('playNotificationSound called, soundEnabled:', this.soundEnabled)
+    
+    if (!this.soundEnabled) {
+      console.log('Sound disabled, skipping')
+      return
+    }
+
+    // Try to play a simple beep sound first
+    this.playSystemBeep()
+
+    // Also try Web Audio API
+    if (this.audioContext) {
+      this.playWebAudioSound(options)
+    }
+  }
+
+  private playSystemBeep(): void {
+    try {
+      // Create a simple audio element for system beep
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmYTBkOa3PbMcCMEJHzA9t+UPwgVY7Tr7ZxPDwtCptPzu2ESDUSa2/fNayEEJ3bE9uKQPwkSY6/k7KdTGAhJqeXzuV8SDUGm0PPfNwsGJ3/A9+KRNS0FNKzX8Lx1IAoaX6rf9qpTFQ1MqN/2wXIgCALx1+DMXys')
+      audio.volume = 0.3
+      audio.play().catch(e => console.log('System beep failed:', e))
+    } catch (error) {
+      console.log('System beep not available')
+    }
+  }
+
+  private playWebAudioSound(options: NotificationSoundOptions = {}): void {
+    if (!this.audioContext) return
 
     try {
       const audioContext = this.audioContext
@@ -244,6 +291,8 @@ export class NotificationService {
       // Play sound
       oscillator.start(audioContext.currentTime)
       oscillator.stop(audioContext.currentTime + duration)
+
+      console.log('Web Audio sound played successfully')
     } catch (error) {
       console.error('Error playing notification sound:', error)
     }

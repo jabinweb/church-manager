@@ -106,6 +106,30 @@ export function ChatLayout() {
     fetchInitialData()
   }, [setConversations])
 
+  // Test notification on mount (for debugging)
+  useEffect(() => {
+    if (session?.user?.id && notificationPermission === 'granted') {
+      console.log('Chat layout mounted, testing notification system')
+      
+      // Test notification after 5 seconds
+      const timer = setTimeout(() => {
+        console.log('Triggering test notification')
+        showMessageNotification(
+          'Test User',
+          'This is a test notification to verify the system is working',
+          undefined,
+          'test-conversation'
+        ).then((notification) => {
+          console.log('Test notification result:', notification)
+        }).catch((error) => {
+          console.error('Test notification failed:', error)
+        })
+      }, 5000)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [session?.user?.id, notificationPermission, showMessageNotification])
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -179,6 +203,17 @@ export function ChatLayout() {
         setSelectedConversation={setSelectedConversation}
         session={session}
       />
+
+      {/* Debug info for notifications */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-4 left-4 z-50 px-3 py-2 bg-black text-white text-xs rounded">
+          <div>Permission: {notificationPermission}</div>
+          <div>Focused: {isWindowFocused ? 'Yes' : 'No'}</div>
+          <div>Sound: {soundEnabled ? 'On' : 'Off'}</div>
+          <div>Connected: {isConnected ? 'Yes' : 'No'}</div>
+          <div>User: {session?.user?.id || 'None'}</div>
+        </div>
+      )}
     </div>
   )
 }
