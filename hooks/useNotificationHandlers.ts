@@ -1,11 +1,11 @@
 import { useEffect } from 'react'
-import type { Conversation } from '@/components/chat/ChatLayout'
+import type { LegacyConversation, LegacyMessage } from '@/components/chat/ChatLayout'
 
 interface UseNotificationHandlersProps {
   session: any
-  conversations: Conversation[]
-  showMessageNotification: (senderName: string, message: string, senderImage?: string, conversationId?: string) => Promise<Notification | null>
-  setSelectedConversation: (conversation: Conversation | null) => void
+  conversations: LegacyConversation[]
+  showMessageNotification: (message: LegacyMessage) => void
+  setSelectedConversation: (conversation: LegacyConversation | null) => void
 }
 
 export function useNotificationHandlers({
@@ -23,15 +23,15 @@ export function useNotificationHandlers({
         const senderName = sender.name || 'Someone'        
                 
         showMessageNotification(
-          senderName,
-          message.content,
-          sender.image || undefined,
-          message.conversationId
-        ).then((notification) => {
-          console.log('Notification shown successfully:', notification)
-        }).catch((error) => {
-          console.error('Failed to show notification:', error)
-        })
+          {
+            ...message,
+            sender: {
+              ...message.sender,
+              name: senderName,
+              image: sender.image || undefined
+            }
+          }
+        )
       } else {
         console.log('Not showing notification:', {
           isReceived,
@@ -66,15 +66,15 @@ export function useNotificationHandlers({
           const senderName = sender.name || 'Someone'
                     
           showMessageNotification(
-            senderName,
-            message.content,
-            sender.image || undefined,
-            message.conversationId
-          ).then((notification) => {
-            console.log('SSE notification shown successfully:', notification)
-          }).catch((error) => {
-            console.error('Failed to show SSE notification:', error)
-          })
+            {
+              ...message,
+              sender: {
+                ...message.sender,
+                name: senderName,
+                image: sender.image || undefined
+              }
+            }
+          )
         }
       }
     }

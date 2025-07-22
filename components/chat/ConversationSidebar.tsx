@@ -5,33 +5,89 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MessageCircle, Search, Plus } from 'lucide-react'
 import { ConversationList } from './ConversationList'
-import type { Conversation } from './ChatLayout'
+import { toast } from 'sonner'
+import type { Conversation } from '@/lib/types/messaging'
 
 interface ConversationSidebarProps {
   conversations: Conversation[]
   selectedConversation: Conversation | null
   setSelectedConversation: (conversation: Conversation | null) => void
+  setConversations: (conversations: Conversation[] | ((prev: Conversation[]) => Conversation[])) => void
   session: any
   setNewConversationOpen: (open: boolean) => void
+  conversationType: 'direct' | 'groups' | 'broadcasts' | 'channels'
 }
 
 export function ConversationSidebar({
   conversations,
   selectedConversation,
   setSelectedConversation,
+  setConversations,
   session,
-  setNewConversationOpen
+  setNewConversationOpen,
+  conversationType
 }: ConversationSidebarProps) {
   const [searchTerm, setSearchTerm] = useState('')
 
   const getOtherParticipant = (conversation: Conversation) => {
-    return conversation.participants.find(p => p.id !== session?.user?.id)
+    return conversation.participants.find(p => p.userId !== session?.user?.id)
   }
 
   const filteredConversations = conversations.filter(conv => {
     const otherParticipant = getOtherParticipant(conv)
-    return otherParticipant?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    return otherParticipant?.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           conv.name?.toLowerCase().includes(searchTerm.toLowerCase())
   })
+
+  const handleDeleteConversation = async (conversationId: string, event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    // Find the conversation to determine the type
+    const conversation = conversations.find(c => c.id === conversationId)
+    const conversationType = conversation?.type || 'DIRECT'
+    
+    let confirmMessage = ''
+    
+    if (conversationType === 'DIRECT') {
+      confirmMessage = 'Are you sure you want to delete this conversation? It will be removed from your chat list but the other person will still have it.'
+    } else {
+      confirmMessage = 'Are you sure you want to delete this conversation? This will delete it for all members and cannot be undone.'
+    }
+
+    if (!confirm(confirmMessage)) {
+      return
+    }
+
+    try {
+      console.log(`Attempting to delete conversation: ${conversationId}`)
+      
+      const response = await fetch(`/api/messages/conversations/${conversationId}`, {
+        method: 'DELETE'
+      })
+
+      console.log(`Delete response status: ${response.status}`)
+
+      if (response.ok) {
+        toast.success('Conversation deleted successfully')
+        
+        setConversations((prev: Conversation[]) => 
+          prev.filter((conv: Conversation) => conv.id !== conversationId)
+        )
+        
+        if (selectedConversation?.id === conversationId) {
+          setSelectedConversation(null)
+        }
+      } else {
+        const errorData = await response.json()
+        console.error('Delete conversation error:', errorData)
+        toast.error(errorData.error || 'Failed to delete conversation')
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error)
+      toast.error('Failed to delete conversation')
+    }
+  }
 
   return (
     <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
@@ -80,7 +136,10 @@ export function ConversationSidebar({
             conversations={filteredConversations}
             selectedConversation={selectedConversation}
             setSelectedConversation={setSelectedConversation}
+            setConversations={setConversations}
             getOtherParticipant={getOtherParticipant}
+            session={session}
+            onDeleteConversation={handleDeleteConversation}
           />
         )}
       </div>

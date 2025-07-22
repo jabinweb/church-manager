@@ -68,30 +68,31 @@ model User {
   updatedAt     DateTime  @default(now())
 
   // Relations
-  accounts           Account[]
-  sessions           Session[]
-  memberProfile      MemberProfile?
-  donations          Donation[]
-  eventRegistrations EventRegistration[]
-  prayerRequests     PrayerRequest[]
-  blogPosts          BlogPost[]
-  orders             Order[]
-  sermons            Sermon[]
-  products           Product[]
-  attendance         Attendance[]
-  ledSmallGroups     SmallGroup[]
-  smallGroupMembers  SmallGroupMember[]
-  volunteers         Volunteer[]
-  careReceived       PastoralCare[] @relation("CareRecipient")
-  careProvided       PastoralCare[] @relation("CareProvider")
-  addresses          Address[]
-  uploadedFiles      File[]    @relation("UploadedFiles")
-  groupJoinRequests  GroupJoinRequest[]
+  accounts                 Account[]
+  sessions                 Session[]
+  memberProfile            MemberProfile?
+  donations                Donation[]
+  eventRegistrations       EventRegistration[]
+  prayerRequests           PrayerRequest[]
+  blogPosts                BlogPost[]
+  orders                   Order[]
+  sermons                  Sermon[]
+  products                 Product[]
+  attendance               Attendance[]
+  ledSmallGroups           SmallGroup[]
+  smallGroupMembers        SmallGroupMember[]
+  volunteers               Volunteer[]
+  careReceived             PastoralCare[]            @relation("CareRecipient")
+  careProvided             PastoralCare[]            @relation("CareProvider")
+  addresses                Address[]
+  uploadedFiles            File[]                    @relation("UploadedFiles")
+  groupJoinRequests        GroupJoinRequest[]
   conversationParticipants ConversationParticipant[]
-  sentMessages             Message[] @relation("SentMessages")
-  receivedMessages         Message[] @relation("ReceivedMessages")
-  familyMembers     FamilyMember[]
-  linkedFamilyMembers FamilyMember[] @relation("LinkedFamilyMembers")
+  sentMessages             Message[]                 @relation("SentMessages")
+  familyMembers            FamilyMember[]
+  linkedFamilyMembers      FamilyMember[]            @relation("LinkedFamilyMembers")
+  createdConversations     Conversation[]            @relation("CreatedConversations")
+  messageReactions         MessageReaction[]         @relation("MessageReactions")
 
   @@map("users")
 }
@@ -406,8 +407,8 @@ model Order {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @default(now())
 
-  user       User?     @relation(fields: [userId], references: [id])
-  address    Address?  @relation(fields: [addressId], references: [id])
+  user       User?       @relation(fields: [userId], references: [id])
+  address    Address?    @relation(fields: [addressId], references: [id])
   orderItems OrderItem[]
 
   @@map("orders")
@@ -464,21 +465,21 @@ model Category {
 // Add these models to complete the church management system
 
 model Attendance {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
   eventId   String?
   serviceId String?
   checkIn   DateTime
   checkOut  DateTime?
-  method    String   // QR_CODE, MANUAL, KIOSK
+  method    String // QR_CODE, MANUAL, KIOSK
   notes     String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id])
 }
 
 model SmallGroup {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   name        String
   description String?
   leaderId    String
@@ -486,19 +487,19 @@ model SmallGroup {
   meetingTime String
   location    String?
   capacity    Int?
-  isActive    Boolean  @default(true)
+  isActive    Boolean @default(true)
 
-  leader       User                @relation(fields: [leaderId], references: [id])
+  leader       User               @relation(fields: [leaderId], references: [id])
   members      SmallGroupMember[]
   joinRequests GroupJoinRequest[]
 }
 
 model SmallGroupMember {
-  id           String @id @default(cuid())
+  id           String   @id @default(cuid())
   userId       String
   smallGroupId String
   joinedAt     DateTime @default(now())
-  isActive     Boolean @default(true)
+  isActive     Boolean  @default(true)
 
   user       User       @relation(fields: [userId], references: [id])
   smallGroup SmallGroup @relation(fields: [smallGroupId], references: [id])
@@ -559,16 +560,16 @@ model FacilityBooking {
 }
 
 model PastoralCare {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   memberId     String
   pastorId     String
-  type         String   // VISIT, COUNSELING, PRAYER, SUPPORT
+  type         String // VISIT, COUNSELING, PRAYER, SUPPORT
   date         DateTime
-  notes        String   @db.Text
+  notes        String    @db.Text
   followUpDate DateTime?
-  status       String   @default("COMPLETED")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  status       String    @default("COMPLETED")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now())
 
   member User @relation("CareRecipient", fields: [memberId], references: [id])
   pastor User @relation("CareProvider", fields: [pastorId], references: [id])
@@ -583,71 +584,106 @@ enum AddressType {
 }
 
 model Address {
-  id          String      @id @default(cuid())
-  userId      String
-  firstName   String
-  lastName    String
-  company     String?
-  address1    String
-  address2    String?
-  city        String
-  state       String
-  zipCode     String
-  country     String      @default("India")
-  phone       String?
-  isDefault   Boolean     @default(false)
-  type        AddressType @default(HOME)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orders      Order[]
-  
+  id        String      @id @default(cuid())
+  userId    String
+  firstName String
+  lastName  String
+  company   String?
+  address1  String
+  address2  String?
+  city      String
+  state     String
+  zipCode   String
+  country   String      @default("India")
+  phone     String?
+  isDefault Boolean     @default(false)
+  type      AddressType @default(HOME)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
   @@map("addresses")
 }
 
 model File {
-  id             String   @id @default(cuid())
-  name           String
-  originalName   String
-  fileName       String   @unique
-  path           String
-  url            String
-  mimeType       String?
-  size           Int?
-  type           String   // 'file' or 'folder'
-  uploadedById   String
-  parentId       String?
-  isPublic       Boolean  @default(false)
-  isDeleted      Boolean  @default(false)
-  tags           String[]
-  description    String?
-  metadata       Json?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  originalName String
+  fileName     String   @unique
+  path         String
+  url          String
+  mimeType     String?
+  size         Int?
+  type         String // 'file' or 'folder'
+  uploadedById String
+  parentId     String?
+  isPublic     Boolean  @default(false)
+  isDeleted    Boolean  @default(false)
+  tags         String[]
+  description  String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  uploadedBy User @relation("UploadedFiles", fields: [uploadedById], references: [id])
-  parent     File? @relation("FileHierarchy", fields: [parentId], references: [id])
+  uploadedBy User   @relation("UploadedFiles", fields: [uploadedById], references: [id])
+  parent     File?  @relation("FileHierarchy", fields: [parentId], references: [id])
   children   File[] @relation("FileHierarchy")
 
   @@map("files")
 }
 
+// Enhanced Conversation Model for all message types
+enum ConversationType {
+  DIRECT // One-on-one messaging
+  GROUP // Group conversations (small groups, teams, etc.)
+  BROADCAST // Broadcast channels (admin to many)
+  CHANNEL // Topic-based channels
+}
+
 model Conversation {
-  id           String   @id @default(cuid())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String           @id @default(cuid())
+  name        String? // Group name, broadcast channel name, etc.
+  description String? // Channel/group description
+  type        ConversationType @default(DIRECT)
+  imageUrl    String? // Group/channel avatar
+  settings    Json? // Flexible settings per conversation type
+  metadata    Json? // Additional metadata
+  isActive    Boolean          @default(true)
+  isArchived  Boolean          @default(false)
+  createdById String? // Who created this conversation
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @default(now())
 
   participants ConversationParticipant[]
   messages     Message[]
+  creator      User?                     @relation("CreatedConversations", fields: [createdById], references: [id])
 
   @@map("conversations")
 }
 
+// Enhanced Participant Model with roles
+enum ParticipantRole {
+  ADMIN // Can manage conversation, add/remove members
+  MODERATOR // Can moderate content, manage some settings  
+  MEMBER // Regular participant
+  READONLY // Can only read messages (for broadcasts)
+  MUTED // Temporarily cannot send messages
+}
+
 model ConversationParticipant {
-  id             String @id @default(cuid())
+  id             String          @id @default(cuid())
   conversationId String
   userId         String
+  role           ParticipantRole @default(MEMBER)
+  joinedAt       DateTime        @default(now())
+  lastReadAt     DateTime? // For unread count calculation
+  isMuted        Boolean         @default(false) // User muted notifications
+  isActive       Boolean         @default(true) // Active in conversation
+  metadata       Json? // Additional participant data
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -656,31 +692,67 @@ model ConversationParticipant {
   @@map("conversation_participants")
 }
 
-model Message {
-  id             String   @id @default(cuid())
-  content        String   @db.Text
-  senderId       String
-  receiverId     String
-  conversationId String
-  isRead         Boolean  @default(false)
-  createdAt      DateTime @default(now())
+// Enhanced Message Model for all message types
+enum MessageType {
+  TEXT // Regular text message
+  IMAGE // Image message
+  FILE // File attachment
+  AUDIO // Audio message
+  VIDEO // Video message
+  SYSTEM // System notifications (user joined, left, etc.)
+  ANNOUNCEMENT // Special announcements
+  POLL // Poll messages
+  EVENT // Event notifications
+}
 
-  sender       User         @relation("SentMessages", fields: [senderId], references: [id])
-  receiver     User         @relation("ReceivedMessages", fields: [receiverId], references: [id])
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+model Message {
+  id             String      @id @default(cuid())
+  content        String      @db.Text
+  type           MessageType @default(TEXT)
+  senderId       String? // Null for system messages
+  conversationId String
+  replyToId      String? // For threaded conversations
+  metadata       Json? // File URLs, poll data, event data, etc.
+  isPinned       Boolean     @default(false)
+  isEdited       Boolean     @default(false)
+  editedAt       DateTime?
+  readBy         String[]    @default([]) // User IDs who read this message
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @default(now())
+
+  sender       User?             @relation("SentMessages", fields: [senderId], references: [id])
+  conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo      Message?          @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies      Message[]         @relation("MessageReplies")
+  reactions    MessageReaction[]
 
   @@map("messages")
+}
+
+// Message Reactions (emojis)
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String // Unicode emoji
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation("MessageReactions", fields: [userId], references: [id])
+
+  @@unique([messageId, userId, emoji])
+  @@map("message_reactions")
 }
 
 // Family Members
 model FamilyMember {
   id           String    @id @default(cuid())
   userId       String
-  linkedUserId String?   // Link to existing user in the system
+  linkedUserId String? // Link to existing user in the system
   name         String
   email        String?
   phone        String?
-  relationship String    // Spouse, Child, Parent, Sibling, etc.
+  relationship String // Spouse, Child, Parent, Sibling, etc.
   dateOfBirth  DateTime?
   anniversary  DateTime?
   address      String?

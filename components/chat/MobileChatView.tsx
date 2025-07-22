@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { MessageCircle, Search, Plus, ArrowLeft } from 'lucide-react'
+import { MessageCircle, Search, Plus } from 'lucide-react'
 import { ConversationList } from './ConversationList'
 import { ChatArea } from './ChatArea'
-import type { Conversation, Message } from './ChatLayout'
+import type { Conversation, Message } from '@/lib/types/messaging'
 
 interface MobileChatViewProps {
   selectedConversation: Conversation | null
@@ -20,6 +20,7 @@ interface MobileChatViewProps {
   sendTypingIndicator: (conversationId: string, isTyping: boolean) => void
   session: any
   setNewConversationOpen: (open: boolean) => void
+  conversationType: 'direct' | 'groups' | 'broadcasts' | 'channels'
 }
 
 export function MobileChatView({
@@ -33,34 +34,74 @@ export function MobileChatView({
   markAsRead,
   sendTypingIndicator,
   session,
-  setNewConversationOpen
+  setNewConversationOpen,
+  conversationType
 }: MobileChatViewProps) {
   const [searchTerm, setSearchTerm] = useState('')
 
   const getOtherParticipant = (conversation: Conversation) => {
-    return conversation.participants.find(p => p.id !== session?.user?.id)
+    return conversation.participants.find(p => p.userId !== session?.user?.id)
   }
 
   const filteredConversations = conversations.filter(conv => {
     const otherParticipant = getOtherParticipant(conv)
-    return otherParticipant?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    return otherParticipant?.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           conv.name?.toLowerCase().includes(searchTerm.toLowerCase())
   })
+
+  const handleDeleteConversation = async (conversationId: string, event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    // Find the conversation to determine the type
+    const conversation = conversations.find(c => c.id === conversationId)
+    const conversationType = conversation?.type || 'DIRECT'
+    
+    let confirmMessage = ''
+    
+    if (conversationType === 'DIRECT') {
+      confirmMessage = 'Are you sure you want to delete this conversation? It will be removed from your chat list but the other person will still have it.'
+    } else {
+      confirmMessage = 'Are you sure you want to delete this conversation? This will delete it for all members and cannot be undone.'
+    }
+
+    if (!confirm(confirmMessage)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/messages/conversations/${conversationId}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        setConversations((prev: Conversation[]) => 
+          prev.filter((conv: Conversation) => conv.id !== conversationId)
+        )
+        
+        if (selectedConversation?.id === conversationId) {
+          setSelectedConversation(null)
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error)
+    }
+  }
 
   if (selectedConversation) {
     return (
-        // {/* Render ChatArea without the header since we have our own */}
-        <ChatArea
-          selectedConversation={selectedConversation}
-          setSelectedConversation={setSelectedConversation}
-          conversations={conversations}
-          setConversations={setConversations}
-          messages={messages}
-          setMessages={setMessages}
-          typingUsers={typingUsers}
-          markAsRead={markAsRead}
-          sendTypingIndicator={sendTypingIndicator}
-          session={session}
-        />
+      <ChatArea
+        selectedConversation={selectedConversation}
+        setSelectedConversation={setSelectedConversation}
+        conversations={conversations}
+        setConversations={setConversations}
+        messages={messages}
+        setMessages={setMessages}
+        typingUsers={typingUsers}
+        markAsRead={markAsRead}
+        sendTypingIndicator={sendTypingIndicator}
+        session={session}
+      />
     )
   }
 
@@ -111,7 +152,10 @@ export function MobileChatView({
             conversations={filteredConversations}
             selectedConversation={selectedConversation}
             setSelectedConversation={setSelectedConversation}
+            setConversations={setConversations}
             getOtherParticipant={getOtherParticipant}
+            session={session}
+            onDeleteConversation={handleDeleteConversation}
           />
         )}
       </div>

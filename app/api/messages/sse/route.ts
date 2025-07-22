@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/auth'
-import { addConnection, removeConnection } from '@/lib/sse-manager'
+import { SSEManager } from '@/lib/sse-manager'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = session.user.id
+    const sseManager = SSEManager.getInstance()
     console.log('SSE connection request from user:', userId)
 
     // Create SSE stream
@@ -19,33 +20,34 @@ export async function GET(request: NextRequest) {
         console.log('Starting SSE stream for user:', userId)
         
         // Store connection
-        addConnection(userId, controller)
+        sseManager.addConnection(userId, controller)
         
         // Send initial connection message
-        controller.enqueue(`data: ${JSON.stringify({
+        const encoder = new TextEncoder()
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({
           type: 'connected',
           userId,
           timestamp: new Date().toISOString()
-        })}\n\n`)
+        })}\n\n`))
 
         // Send periodic heartbeat
         const heartbeat = setInterval(() => {
           try {
-            controller.enqueue(`data: ${JSON.stringify({
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
               type: 'heartbeat',
               timestamp: new Date().toISOString()
-            })}\n\n`)
+            })}\n\n`))
           } catch (error) {
             console.log('Heartbeat failed, cleaning up connection for user:', userId)
             clearInterval(heartbeat)
-            removeConnection(userId)
+            sseManager.removeConnection(userId)
           }
         }, 30000) // 30 seconds
 
         // Cleanup on close
         request.signal.addEventListener('abort', () => {
           console.log('SSE connection aborted for user:', userId)
-          removeConnection(userId)
+          sseManager.removeConnection(userId)
           clearInterval(heartbeat)
           try {
             controller.close()
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
       },
       cancel() {
         console.log('SSE stream cancelled for user:', userId)
-        removeConnection(userId)
+        sseManager.removeConnection(userId)
       }
     })
 
@@ -74,4 +76,3 @@ export async function GET(request: NextRequest) {
     return new Response('Internal Server Error', { status: 500 })
   }
 }
-  

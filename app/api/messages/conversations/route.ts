@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { prisma } from '@/lib/prisma'
+import { MessagingService } from '@/lib/services/messaging'
+import { SSEManager } from '@/lib/sse-manager'
+import { NextResponse } from 'next/server'
 
 export async function GET() {
   try {
@@ -10,81 +11,45 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const conversations = await prisma.conversation.findMany({
-      where: {
-        participants: {
-          some: {
-            userId: session.user.id
-          }
-        }
-      },
-      include: {
-        participants: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                image: true
-              }
-            }
-          }
-        },
-        messages: {
-          orderBy: {
-            createdAt: 'desc'
-          },
-          take: 1,
-          include: {
-            sender: {
-              select: {
-                id: true,
-                name: true,
-                image: true
-              }
-            },
-            receiver: {
-              select: {
-                id: true,
-                name: true,
-                image: true
-              }
-            }
-          }
-        },
-        _count: {
-          select: {
-            messages: {
-              where: {
-                receiverId: session.user.id,
-                isRead: false
-              }
-            }
-          }
-        }
-      },
-      orderBy: {
-        updatedAt: 'desc'
-      }
-    })
+    console.log(`Fetching conversations for user: ${session.user.id}`)
 
-    // Transform the data
-    const formattedConversations = conversations.map(conv => ({
-      id: conv.id,
-      participants: conv.participants.map(p => p.user),
-      lastMessage: conv.messages[0] || null,
-      unreadCount: conv._count.messages,
-      updatedAt: conv.updatedAt.toISOString()
+    const conversations = await MessagingService.getUserConversations(session.user.id)
+
+    console.log(`Found ${conversations.length} conversations for user ${session.user.id}`)
+    
+    // Log broadcast conversations specifically
+    const broadcastConversations = conversations.filter(c => c.type === 'BROADCAST')
+    console.log(`Found ${broadcastConversations.length} broadcast conversations:`, 
+      broadcastConversations.map(c => ({ id: c.id, name: c.name, participantCount: c.participants?.length }))
+    )
+
+    // Filter conversations to only show those where user is an active participant
+    // This automatically handles the "deleted" conversations for direct messages
+    const activeConversations = conversations.filter(conv => {
+      const userParticipant = conv.participants.find(p => p.userId === session.user.id)
+      return userParticipant?.isActive !== false
+    })
+    
+    console.log(`Returning ${activeConversations.length} active conversations`)
+
+    // Ensure the returned conversations match our unified type structure
+    const formattedConversations = activeConversations.map(conv => ({
+      ...conv,
+      type: conv.type || 'DIRECT',
+      isActive: conv.isActive ?? true,
+      isArchived: conv.isArchived ?? false,
+      createdAt: conv.createdAt || new Date().toISOString(),
+      updatedAt: conv.updatedAt || new Date().toISOString(),
     }))
 
     return NextResponse.json({ conversations: formattedConversations })
   } catch (error) {
     console.error('Error fetching conversations:', error)
-    return NextResponse.json({ error: 'Failed to fetch conversations' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const session = await auth()
     
@@ -92,155 +57,54 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { participantId } = await request.json()
-
-    if (!participantId || participantId === session.user.id) {
-      return NextResponse.json({ error: 'Invalid participant' }, { status: 400 })
-    }
-
-    // Check if conversation already exists between these two users
-    const existingConversations = await prisma.conversation.findMany({
-      where: {
-        participants: {
-          every: {
-            userId: {
-              in: [session.user.id, participantId]
-            }
-          }
-        }
-      },
-      include: {
-        participants: true,
-        _count: {
-          select: {
-            participants: true
-          }
-        }
-      }
-    })
-
-    // Filter to only conversations with exactly 2 participants (both users)
-    const directConversations = existingConversations.filter(conv => 
-      conv._count.participants === 2 &&
-      conv.participants.some(p => p.userId === session.user.id) &&
-      conv.participants.some(p => p.userId === participantId)
-    )
+    const { type, participantIds, name, description, settings } = await request.json()
 
     let conversation
 
-    if (directConversations.length > 0) {
-      // Use the first existing conversation
-      conversation = directConversations[0]
-
-      // If there are multiple conversations, delete the duplicates
-      if (directConversations.length > 1) {
-        const duplicateIds = directConversations.slice(1).map(conv => conv.id)
-        
-        // Delete messages from duplicate conversations first
-        await prisma.message.deleteMany({
-          where: {
-            conversationId: {
-              in: duplicateIds
-            }
-          }
-        })
-
-        // Delete participants from duplicate conversations
-        await prisma.conversationParticipant.deleteMany({
-          where: {
-            conversationId: {
-              in: duplicateIds
-            }
-          }
-        })
-
-        // Delete the duplicate conversations
-        await prisma.conversation.deleteMany({
-          where: {
-            id: {
-              in: duplicateIds
-            }
-          }
-        })
-      }
-    } else {
-      // Create new conversation
-      conversation = await prisma.conversation.create({
-        data: {
-          participants: {
-            create: [
-              { userId: session.user.id },
-              { userId: participantId }
-            ]
-          }
-        },
-        include: {
-          participants: true
+    switch (type) {
+      case 'DIRECT':
+        if (!participantIds || participantIds.length !== 1) {
+          return NextResponse.json({ error: 'Direct conversations require exactly one participant' }, { status: 400 })
         }
-      })
+        conversation = await MessagingService.createDirectConversation(session.user.id, participantIds[0])
+        break
+
+      case 'GROUP':
+        if (!name) {
+          return NextResponse.json({ error: 'Group name is required' }, { status: 400 })
+        }
+        conversation = await MessagingService.createGroupConversation(
+          session.user.id,
+          name,
+          description,
+          participantIds || [],
+          settings || {}
+        )
+        break
+
+      case 'BROADCAST':
+        if (!name) {
+          return NextResponse.json({ error: 'Broadcast channel name is required' }, { status: 400 })
+        }
+        // Only admins/pastors can create broadcast channels
+        if (!['ADMIN', 'PASTOR'].includes(session.user.role as string)) {
+          return NextResponse.json({ error: 'Insufficient permissions to create broadcast channel' }, { status: 403 })
+        }
+        conversation = await MessagingService.createBroadcastChannel(
+          session.user.id,
+          name,
+          description,
+          settings || {}
+        )
+        break
+
+      default:
+        return NextResponse.json({ error: 'Invalid conversation type' }, { status: 400 })
     }
 
-    // Fetch the conversation with full details
-    const fullConversation = await prisma.conversation.findUnique({
-      where: { id: conversation.id },
-      include: {
-        participants: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                image: true
-              }
-            }
-          }
-        },
-        messages: {
-          orderBy: {
-            createdAt: 'desc'
-          },
-          take: 1,
-          include: {
-            sender: {
-              select: {
-                id: true,
-                name: true,
-                image: true
-              }
-            },
-            receiver: {
-              select: {
-                id: true,
-                name: true,
-                image: true
-              }
-            }
-          }
-        },
-        _count: {
-          select: {
-            messages: {
-              where: {
-                receiverId: session.user.id,
-                isRead: false
-              }
-            }
-          }
-        }
-      }
-    })
-
-    const formattedConversation = {
-      id: fullConversation!.id,
-      participants: fullConversation!.participants.map(p => p.user),
-      lastMessage: fullConversation!.messages[0] || null,
-      unreadCount: fullConversation!._count.messages,
-      updatedAt: fullConversation!.updatedAt.toISOString()
-    }
-
-    return NextResponse.json({ conversation: formattedConversation })
+    return NextResponse.json({ conversation })
   } catch (error) {
     console.error('Error creating conversation:', error)
-    return NextResponse.json({ error: 'Failed to create conversation' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

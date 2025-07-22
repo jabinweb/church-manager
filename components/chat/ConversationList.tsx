@@ -1,78 +1,142 @@
 'use client'
 
+import { format } from 'date-fns'
+import { MoreVertical, Trash2 } from 'lucide-react'
 import Image from 'next/image'
-import { Badge } from '@/components/ui/badge'
-import { formatDistanceToNow } from 'date-fns'
 import { cn } from '@/lib/utils'
-import type { Conversation } from './ChatLayout'
+import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import type { Conversation, ConversationParticipant } from '@/lib/types/messaging'
 
 interface ConversationListProps {
   conversations: Conversation[]
   selectedConversation: Conversation | null
-  setSelectedConversation: (conversation: Conversation) => void
-  getOtherParticipant: (conversation: Conversation) => any
+  setSelectedConversation: (conversation: Conversation | null) => void
+  setConversations: (conversations: Conversation[] | ((prev: Conversation[]) => Conversation[])) => void
+  getOtherParticipant: (conversation: Conversation) => ConversationParticipant | undefined
+  session: any
+  onDeleteConversation: (conversationId: string, event: React.MouseEvent) => void
 }
 
 export function ConversationList({
   conversations,
   selectedConversation,
   setSelectedConversation,
-  getOtherParticipant
+  getOtherParticipant,
+  session,
+  onDeleteConversation
 }: ConversationListProps) {
+  
+  const getConversationName = (conversation: Conversation) => {
+    if (conversation.name) {
+      return conversation.name
+    }
+    
+    const otherParticipant = getOtherParticipant(conversation)
+    return otherParticipant?.user?.name || 'Unknown User'
+  }
+
+  const getConversationImage = (conversation: Conversation) => {
+    if (conversation.imageUrl) {
+      return conversation.imageUrl
+    }
+    
+    const otherParticipant = getOtherParticipant(conversation)
+    return otherParticipant?.user?.image
+  }
+
+  const getLastMessagePreview = (conversation: Conversation) => {
+    if (!conversation.lastMessage) {
+      return 'No messages yet'
+    }
+    
+    const isOwnMessage = conversation.lastMessage.senderId === session?.user?.id
+    const prefix = isOwnMessage ? 'You: ' : ''
+    
+    return `${prefix}${conversation.lastMessage.content}`
+  }
+
   return (
-    <div className="space-y-1 p-2">
+    <div className="divide-y divide-gray-100">
       {conversations.map((conversation) => {
-        const otherParticipant = getOtherParticipant(conversation)
+        const conversationName = getConversationName(conversation)
+        const conversationImage = getConversationImage(conversation)
+        const lastMessagePreview = getLastMessagePreview(conversation)
+        const isSelected = selectedConversation?.id === conversation.id
+
         return (
           <div
             key={conversation.id}
             onClick={() => setSelectedConversation(conversation)}
             className={cn(
-              "p-3 rounded-lg cursor-pointer transition-colors",
-              selectedConversation?.id === conversation.id
-                ? "bg-purple-100 border border-purple-200"
-                : "hover:bg-gray-100"
+              "p-4 hover:bg-gray-50 cursor-pointer transition-colors group relative",
+              isSelected && "bg-purple-50 hover:bg-purple-50 border-r-2 border-purple-500"
             )}
           >
             <div className="flex items-start space-x-3">
               {/* Avatar */}
-              {otherParticipant?.image ? (
+              {conversationImage ? (
                 <Image
-                  src={otherParticipant.image}
-                  alt={otherParticipant.name || 'User'}
+                  src={conversationImage}
+                  alt={conversationName}
                   width={40}
                   height={40}
-                  className="w-10 h-10 rounded-full object-cover"
+                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
                 />
               ) : (
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center">
-                  <span className="text-white font-semibold">
-                    {otherParticipant?.name ? otherParticipant.name.charAt(0).toUpperCase() : 'U'}
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-semibold text-sm">
+                    {conversationName.charAt(0).toUpperCase()}
                   </span>
                 </div>
               )}
 
+              {/* Content */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
                   <h3 className="font-medium text-gray-900 truncate">
-                    {otherParticipant?.name || 'Unknown User'}
+                    {conversationName}
                   </h3>
-                  {conversation.unreadCount > 0 && (
-                    <Badge className="bg-purple-600 text-white text-xs">
-                      {conversation.unreadCount}
-                    </Badge>
-                  )}
+                  <div className="flex items-center space-x-1">
+                    {conversation.lastMessage && (
+                      <span className="text-xs text-gray-500">
+                        {format(new Date(conversation.lastMessage.createdAt), 'MMM dd')}
+                      </span>
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreVertical className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          className="text-red-600 focus:text-red-600"
+                          onClick={(e) => onDeleteConversation(conversation.id, e)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
                 
-                {conversation.lastMessage && (
+                <div className="flex items-center justify-between mt-1">
                   <p className="text-sm text-gray-600 truncate">
-                    {conversation.lastMessage.content}
+                    {lastMessagePreview}
                   </p>
-                )}
-                
-                <p className="text-xs text-gray-400 mt-1">
-                  {conversation.lastMessage && formatDistanceToNow(new Date(conversation.lastMessage.createdAt), { addSuffix: true })}
-                </p>
+                  {conversation.unreadCount && conversation.unreadCount > 0 && (
+                    <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-purple-600 rounded-full">
+                      {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
