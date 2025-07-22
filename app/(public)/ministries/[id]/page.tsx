@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { MapPin, User, Clock } from 'lucide-react'
+import { MapPin, User, Clock, ArrowLeft } from 'lucide-react'
 import Image from 'next/image'
+import Link from 'next/link'
 
 interface Ministry {
   id: string
@@ -98,10 +98,14 @@ export default function MinistryPage() {
                 style={{ width: '100%', height: 'auto' }}
                 priority
               />
-            <div className="mt-6">
-              <Button asChild variant="outline" size="sm">
-                <a href="/ministries">Back to Ministries</a>
-              </Button>
+            <div className="mb-6">
+              <Link 
+                href="/ministries/"
+                className="text-purple-600 hover:text-purple-700 text-sm font-medium inline-flex items-center"
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back to Ministries
+              </Link>
             </div>
           </CardContent>
         </Card>

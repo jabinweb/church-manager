@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Bell, BellOff, Volume2, VolumeX, TestTube } from 'lucide-react'
+import { Bell, BellOff, Volume2, VolumeX } from 'lucide-react'
 import { useNotification } from '@/lib/hooks/useNotification'
 import { toast } from 'sonner'
 

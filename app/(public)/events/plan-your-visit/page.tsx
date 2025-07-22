@@ -144,7 +144,7 @@ export default function PlanYourVisitPage() {
           </div>
           <h1 className="text-4xl font-bold mb-4">Plan Your Visit</h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            We're excited to welcome you! Let us know when you're coming so we can prepare a warm welcome.
+            We&apos;re excited to welcome you! Let us know when you&apos;re coming so we can prepare a warm welcome.
           </p>
         </motion.div>
         
@@ -158,9 +158,9 @@ export default function PlanYourVisitPage() {
                     <div className="bg-green-100 text-green-700 rounded-full h-16 w-16 flex items-center justify-center mx-auto mb-4">
                       <Check className="h-8 w-8" />
                     </div>
-                    <h3 className="text-2xl font-semibold mb-2">You're All Set!</h3>
+                    <h3 className="text-2xl font-semibold mb-2">You&apos;re All Set!</h3>
                     <p className="text-gray-600 mb-6 max-w-lg mx-auto">
-                      We've received your information and are looking forward to meeting you on{' '}
+                      We&apos;ve received your information and are looking forward to meeting you on{' '}
                       <span className="font-semibold">
                         {form.getValues('visitDate') && format(form.getValues('visitDate'), 'EEEE, MMMM d, yyyy')}
                       </span>{' '}
@@ -186,7 +186,7 @@ export default function PlanYourVisitPage() {
                       
                       <div className="space-y-3">
                         <p className="text-gray-500 text-sm">
-                          We've sent a confirmation email to {form.getValues('email')} with all the details.
+                          We&apos;ve sent a confirmation email to {form.getValues('email')} with all the details.
                         </p>
                         <Button className="bg-purple-600 hover:bg-purple-700" asChild>
                           <Link href="/visit">
@@ -204,7 +204,7 @@ export default function PlanYourVisitPage() {
                 <CardHeader>
                   <CardTitle>Register Your Visit</CardTitle>
                   <CardDescription>
-                    Tell us a little about yourself and when you'd like to join us
+                    Tell us a little about yourself and when you&apos;d like to join us
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -379,9 +379,9 @@ export default function PlanYourVisitPage() {
                                 />
                               </FormControl>
                               <div className="space-y-1 leading-none">
-                                <FormLabel>I'm bringing children</FormLabel>
+                                <FormLabel>I&apos;m bringing children</FormLabel>
                                 <FormDescription>
-                                  We have children's programs during our services
+                                  We have children&apos;s programs during our services
                                 </FormDescription>
                               </div>
                             </FormItem>
@@ -430,7 +430,7 @@ export default function PlanYourVisitPage() {
                                       value={field.value || ''}
                                     />
                                   </FormControl>
-                                  <FormDescription>Enter children's ages</FormDescription>
+                                  <FormDescription>Enter children&apos;s ages</FormDescription>
                                   <FormMessage />
                                 </FormItem>
                               )}

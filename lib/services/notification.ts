@@ -88,7 +88,6 @@ export class NotificationService {
     
     // Set initial state
     this.isWindowFocused = !document.hidden && document.hasFocus()
-    console.log('Initial window focus state:', this.isWindowFocused)
 
     // Cleanup function
     return () => {
@@ -135,10 +134,6 @@ export class NotificationService {
   }
 
   public async show(options: NotificationOptions): Promise<Notification | null> {
-    console.log('NotificationService.show called with options:', options)
-    console.log('Window focused:', this.isWindowFocused)
-    console.log('Permission:', this.permission)
-    console.log('Sound enabled:', this.soundEnabled)
     
     // Show notification if window is not focused OR if explicitly requested
     if (this.isWindowFocused && !options.requireInteraction) {
@@ -169,13 +164,8 @@ export class NotificationService {
         browserNotificationOptions.actions = options.actions
       }
 
-      console.log('Creating notification with title:', options.title)
-      console.log('Notification options:', browserNotificationOptions)
-
       // Create notification with title and options
       const notification = new Notification(options.title, browserNotificationOptions)
-
-      console.log('Notification created successfully')
 
       // Play notification sound if enabled and not silent
       if (this.soundEnabled && !options.silent) {
@@ -299,7 +289,6 @@ export class NotificationService {
   }
 
   public showMessageNotification(senderName: string, message: string, senderImage?: string, conversationId?: string): Promise<Notification | null> {
-    console.log('showMessageNotification called:', { senderName, message, senderImage, conversationId })
     
     return this.show({
       title: `New message from ${senderName}`,

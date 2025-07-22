@@ -1,31 +1,12 @@
 {
-  "name": "Grace Community Church - Church Management System",
-  "short_name": "Grace Church",
-  "description": "Complete church management platform with sermons, events, member management, and online giving",
-  "start_url": "/",
+  "name": "Church Management System",
+  "short_name": "ChurchCMS",
+  "description": "Complete church management solution with messaging, events, and community features",
+  "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#7C3AED",
+  "theme_color": "#7c3aed",
   "orientation": "portrait-primary",
-  "scope": "/",
-  "lang": "en",
-  "categories": ["lifestyle", "education", "social", "productivity"],
-  "screenshots": [
-    {
-      "src": "/images/screenshot-wide.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Church management dashboard"
-    },
-    {
-      "src": "/images/screenshot-narrow.png",
-      "sizes": "375x812",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Mobile church interface"
-    }
-  ],
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
@@ -76,36 +57,55 @@
       "purpose": "maskable any"
     }
   ],
+  "categories": ["productivity", "lifestyle", "social"],
+  "screenshots": [
+    {
+      "src": "/screenshots/dashboard.png",
+      "sizes": "1280x720",
+      "type": "image/png"
+    },
+    {
+      "src": "/screenshots/messages.png",
+      "sizes": "1280x720",
+      "type": "image/png"
+    }
+  ],
   "shortcuts": [
     {
-      "name": "Sermons",
-      "short_name": "Sermons",
-      "description": "Listen to latest sermons",
-      "url": "/sermons",
-      "icons": [{"src": "/icons/sermon-96x96.png", "sizes": "96x96"}]
+      "name": "Messages",
+      "short_name": "Messages",
+      "description": "View and send messages",
+      "url": "/dashboard/messages",
+      "icons": [
+        {
+          "src": "/icons/messages-icon.png",
+          "sizes": "96x96"
+        }
+      ]
     },
     {
       "name": "Events",
       "short_name": "Events",
-      "description": "View church events",
-      "url": "/events",
-      "icons": [{"src": "/icons/events-96x96.png", "sizes": "96x96"}]
+      "description": "View upcoming events",
+      "url": "/dashboard/events",
+      "icons": [
+        {
+          "src": "/icons/events-icon.png",
+          "sizes": "96x96"
+        }
+      ]
     },
     {
-      "name": "Give",
-      "short_name": "Give",
-      "description": "Make a donation",
-      "url": "/giving",
-      "icons": [{"src": "/icons/giving-96x96.png", "sizes": "96x96"}]
-    },
-    {
-      "name": "Prayer Request",
-      "short_name": "Prayer",
-      "description": "Submit prayer request",
-      "url": "/prayer-request",
-      "icons": [{"src": "/icons/prayer-96x96.png", "sizes": "96x96"}]
+      "name": "Directory",
+      "short_name": "Directory",
+      "description": "Church member directory",
+      "url": "/dashboard/directory",
+      "icons": [
+        {
+          "src": "/icons/directory-icon.png",
+          "sizes": "96x96"
+        }
+      ]
     }
-  ],
-  "related_applications": [],
-  "prefer_related_applications": false
+  ]
 }

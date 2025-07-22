@@ -274,7 +274,7 @@ export function ChatArea({
   const otherParticipant = getOtherParticipant(selectedConversation)
 
   return (
-    <div className="flex-1 flex flex-col h-full max-h-screen">
+    <div className="flex-1 flex flex-col md:justify-between justify-normal h-full max-h-screen">
       {/* Chat Header */}
       <div className="p-4 border-b border-gray-200 bg-white flex-shrink-0">
         <div className="flex items-center justify-between">
@@ -327,7 +327,7 @@ export function ChatArea({
         className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0 scroll-smooth"
         style={{ 
           height: 'calc(100vh - 140px)',
-          maxHeight: 'calc(93vh - 200px)',
+          maxHeight: 'calc(93vh - 150px)',
           scrollBehavior: 'smooth'
         }}
       >

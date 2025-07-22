@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { notificationService, NotificationOptions, NotificationAction } from '@/lib/services/notification'
+import { notificationService, NotificationOptions } from '@/lib/services/notification'
 
 export interface UseNotificationReturn {
   permission: NotificationPermission
