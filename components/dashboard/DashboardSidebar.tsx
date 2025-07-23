@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -20,7 +20,9 @@ import {
   ChevronRight,
   Menu,
   X,
-  MessageCircle
+  MessageCircle,
+  LogOut,
+  ExternalLink
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -121,6 +123,10 @@ export function DashboardSidebar({ isMobileOpen, setIsMobileOpen }: DashboardSid
   const handleLinkClick = () => {
     // Close mobile menu when a link is clicked
     setIsMobileOpen(false)
+  }
+
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: '/' })
   }
 
   // Prevent hydration mismatch by not rendering until mounted
@@ -227,6 +233,27 @@ export function DashboardSidebar({ isMobileOpen, setIsMobileOpen }: DashboardSid
             )
           })}
         </nav>
+      </div>
+
+      {/* Bottom Action Buttons */}
+      <div className="p-4 border-t border-gray-200 space-y-2">
+        <Link
+          href="/"
+          onClick={handleLinkClick}
+          className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors w-full"
+        >
+          <ExternalLink className="h-5 w-5" />
+          <span>View Site</span>
+        </Link>
+        
+        <Button
+          onClick={handleLogout}
+          variant="ghost"
+          className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors w-full justify-start"
+        >
+          <LogOut className="h-5 w-5" />
+          <span>Logout</span>
+        </Button>
       </div>
     </>
   )
