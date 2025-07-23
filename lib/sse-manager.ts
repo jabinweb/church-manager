@@ -1,48 +1,80 @@
 // SSE Manager for handling real-time connections
-export class SSEManager {
-  private static instance: SSEManager
+class SSEManagerClass {
   private connections = new Map<string, ReadableStreamDefaultController>()
 
-  private constructor() {}
-
-  static getInstance(): SSEManager {
-    if (!SSEManager.instance) {
-      SSEManager.instance = new SSEManager()
-    }
-    return SSEManager.instance
-  }
-
   addConnection(userId: string, controller: ReadableStreamDefaultController) {
+    console.log(`SSE Manager: Attempting to add connection for user: ${userId}`)
+    
+    // Remove existing connection if any to prevent duplicates
+    this.removeConnection(userId)
+    
+    // Add the new connection
     this.connections.set(userId, controller)
-    console.log(`SSE connection added for user: ${userId}. Total connections: ${this.connections.size}`)
+    
+    // Test the connection immediately with a different approach
+    try {
+      const testMessage = {
+        type: 'connection_test',
+        data: { 
+          timestamp: new Date().toISOString(),
+          userId: userId,
+          testId: Math.random().toString(36).substr(2, 9)
+        }
+      }
+      const encoder = new TextEncoder()
+      const messageData = `data: ${JSON.stringify(testMessage)}\n\n`
+      controller.enqueue(encoder.encode(messageData))
+      console.log(`SSE Manager: Test message sent successfully to user: ${userId}`)
+    } catch (error) {
+      console.error(`SSE Manager: Test message failed for user: ${userId}`, error)
+      // Don't remove connection here, let it retry
+    }
+    
+    // Return success status
+    return true
   }
 
   removeConnection(userId: string) {
+    const wasConnected = this.connections.has(userId)
     this.connections.delete(userId)
-    console.log(`SSE connection removed for user: ${userId}. Total connections: ${this.connections.size}`)
+    
+    if (wasConnected) {
+      console.log(`SSE Manager: Connection removed for user: ${userId}. Total connections: ${this.connections.size}`)
+      console.log(`SSE Manager: Remaining users: [${Array.from(this.connections.keys()).join(', ')}]`)
+    }
   }
 
   sendToUser(userId: string, data: any): boolean {
+    
     const controller = this.connections.get(userId)
     if (controller) {
       try {
-        console.log('Broadcasting to user:', userId, data)
+        console.log(`SSE Manager: Controller found for user: ${userId}, attempting to send message`)
         const encoder = new TextEncoder()
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
+        const message = `data: ${JSON.stringify(data)}\n\n`
+        controller.enqueue(encoder.encode(message))
+        console.log(`SSE Manager: Message sent successfully to user: ${userId}`)
         return true
       } catch (error) {
-        console.error('Error broadcasting to user:', userId, error)
+        console.error(`SSE Manager: Error sending to user ${userId}:`, error)
+        console.log(`SSE Manager: Removing failed connection for user: ${userId}`)
         this.connections.delete(userId)
         return false
       }
     }
-    console.log('No connection found for user:', userId, 'Active connections:', Array.from(this.connections.keys()))
+
     return false
   }
 
   sendToUsers(userIds: string[], data: any): number {
-    const results = userIds.map(userId => this.sendToUser(userId, data))
-    return results.filter(Boolean).length
+    let successCount = 0
+    for (const userId of userIds) {
+      if (this.sendToUser(userId, data)) {
+        successCount++
+      }
+    }
+    console.log(`SSE Manager: Sent to ${successCount}/${userIds.length} users`)
+    return successCount
   }
 
   getActiveConnections(): number {
@@ -64,4 +96,24 @@ export class SSEManager {
       this.connections.delete(userId)
     }
   }
+
+  // Cleanup all connections
+  cleanupAllConnections() {
+    console.log('SSE Manager: Cleaning up all connections')
+    const userIds = Array.from(this.connections.keys())
+    for (const userId of userIds) {
+      const controller = this.connections.get(userId)
+      if (controller) {
+        try {
+          controller.close()
+        } catch (error) {
+          // Ignore errors
+        }
+      }
+    }
+    this.connections.clear()
+  }
 }
+
+// Export a single global instance to ensure singleton behavior across modules
+export const SSEManager = new SSEManagerClass()

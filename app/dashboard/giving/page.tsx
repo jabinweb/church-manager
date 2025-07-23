@@ -27,7 +27,7 @@ import {
 import { format } from 'date-fns'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useSystemSettings } from '@/lib/useSystemSettings'
+import { useSystemSettings } from '@/lib/hooks/useSystemSettings'
 import Link from 'next/link'
 import { toast } from 'sonner'
 

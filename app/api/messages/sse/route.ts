@@ -7,72 +7,124 @@ export async function GET(request: NextRequest) {
     const session = await auth()
     
     if (!session?.user?.id) {
+      console.log('SSE: Unauthorized connection attempt - no session')
       return new Response('Unauthorized', { status: 401 })
     }
 
-    const userId = session.user.id
-    const sseManager = SSEManager.getInstance()
-    console.log('SSE connection request from user:', userId)
+    console.log(`SSE: Starting connection setup for user: ${session.user.id}`)
 
-    // Create SSE stream
+    const encoder = new TextEncoder()
+    
     const stream = new ReadableStream({
       start(controller) {
-        console.log('Starting SSE stream for user:', userId)
+        let heartbeatInterval: NodeJS.Timeout | null = null
+        let isConnectionClosed = false
         
-        // Store connection
-        sseManager.addConnection(userId, controller)
-        
-        // Send initial connection message
-        const encoder = new TextEncoder()
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-          type: 'connected',
-          userId,
-          timestamp: new Date().toISOString()
-        })}\n\n`))
+        try {
+          // Add connection immediately using the global SSE Manager instance
+          console.log(`SSE: Adding connection for user: ${session.user.id}`)
+          
+          // Add connection and verify it was added
+          SSEManager.addConnection(session.user.id, controller)
+          
+          // Verify the connection was actually added
+          const connectedUsers = SSEManager.getConnectedUsers()
+          console.log(`SSE: Connection verification - User ${session.user.id} in connected users:`, connectedUsers.includes(session.user.id))
+          console.log(`SSE: Total active connections after adding: ${SSEManager.getActiveConnections()}`)
+          console.log(`SSE: All connected users: [${connectedUsers.join(', ')}]`)
 
-        // Send periodic heartbeat
-        const heartbeat = setInterval(() => {
-          try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-              type: 'heartbeat',
-              timestamp: new Date().toISOString()
-            })}\n\n`))
-          } catch (error) {
-            console.log('Heartbeat failed, cleaning up connection for user:', userId)
-            clearInterval(heartbeat)
-            sseManager.removeConnection(userId)
+          // Send initial connection message
+          const initialMessage = {
+            type: 'connection_established',
+            data: {
+              userId: session.user.id,
+              timestamp: new Date().toISOString(),
+              connectionId: Math.random().toString(36).substr(2, 9),
+              totalConnections: SSEManager.getActiveConnections()
+            }
           }
-        }, 30000) // 30 seconds
+          
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(initialMessage)}\n\n`))
+            console.log(`SSE: Initial message sent to user: ${session.user.id}`)
+          } catch (error) {
+            console.error('SSE: Error sending initial message:', error)
+            SSEManager.removeConnection(session.user.id)
+            return
+          }
 
-        // Cleanup on close
-        request.signal.addEventListener('abort', () => {
-          console.log('SSE connection aborted for user:', userId)
-          sseManager.removeConnection(userId)
-          clearInterval(heartbeat)
+          // Set up heartbeat interval
+          heartbeatInterval = setInterval(() => {
+            if (isConnectionClosed) {
+              if (heartbeatInterval) {
+                clearInterval(heartbeatInterval)
+                heartbeatInterval = null
+              }
+              return
+            }
+
+            try {
+              const heartbeat = {
+                type: 'heartbeat',
+                data: { 
+                  timestamp: new Date().toISOString(),
+                  userId: session.user.id,
+                  activeConnections: SSEManager.getActiveConnections(),
+                  connectedUsers: SSEManager.getConnectedUsers()
+                }
+              }
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(heartbeat)}\n\n`))
+              console.log(`SSE: Heartbeat sent to user: ${session.user.id} (${SSEManager.getActiveConnections()} total connections)`)
+            } catch (error) {
+              console.log(`SSE: Heartbeat failed for user ${session.user.id}, cleaning up`)
+              isConnectionClosed = true
+              if (heartbeatInterval) {
+                clearInterval(heartbeatInterval)
+                heartbeatInterval = null
+              }
+              SSEManager.removeConnection(session.user.id)
+            }
+          }, 30000) // Every 30 seconds
+
+          // Handle request abort
+          request.signal?.addEventListener('abort', () => {
+            console.log(`SSE: Request aborted for user: ${session.user.id}`)
+            isConnectionClosed = true
+            if (heartbeatInterval) {
+              clearInterval(heartbeatInterval)
+              heartbeatInterval = null
+            }
+            SSEManager.removeConnection(session.user.id)
+          })
+
+        } catch (error) {
+          console.error('SSE: Error in start():', error)
           try {
             controller.close()
-          } catch (error) {
-            // Controller already closed
+          } catch (closeError) {
+            // Ignore close errors
           }
-        })
+        }
       },
+
       cancel() {
-        console.log('SSE stream cancelled for user:', userId)
-        sseManager.removeConnection(userId)
+        console.log(`SSE: Stream cancelled for user: ${session.user.id}`)
+        SSEManager.removeConnection(session.user.id)
       }
     })
 
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Connection': 'keep-alive',
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Cache-Control'
-      }
+        'Access-Control-Allow-Headers': 'Cache-Control',
+        'X-Accel-Buffering': 'no', // Disable nginx buffering
+      },
     })
   } catch (error) {
-    console.error('SSE connection error:', error)
+    console.error('SSE: Fatal error setting up connection:', error)
     return new Response('Internal Server Error', { status: 500 })
   }
 }

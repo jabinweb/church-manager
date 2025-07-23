@@ -729,7 +729,7 @@ model Message {
   @@map("messages")
 }
 
-// Message Reactions (emojis)
+// Message Reactions (emojis) - Only one reaction per user per message
 model MessageReaction {
   id        String   @id @default(cuid())
   messageId String
@@ -740,7 +740,7 @@ model MessageReaction {
   message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
   user    User    @relation("MessageReactions", fields: [userId], references: [id])
 
-  @@unique([messageId, userId, emoji])
+  @@unique([messageId, userId]) // Only one reaction per user per message
   @@map("message_reactions")
 }
 

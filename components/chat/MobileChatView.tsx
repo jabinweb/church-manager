@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { MessageCircle, Search, Plus } from 'lucide-react'
@@ -38,6 +38,11 @@ export function MobileChatView({
   conversationType
 }: MobileChatViewProps) {
   const [searchTerm, setSearchTerm] = useState('')
+
+  // Clear selected conversation when conversation type changes
+  useEffect(() => {
+    setSelectedConversation(null)
+  }, [conversationType, setSelectedConversation])
 
   const getOtherParticipant = (conversation: Conversation) => {
     return conversation.participants.find(p => p.userId !== session?.user?.id)
@@ -88,27 +93,30 @@ export function MobileChatView({
     }
   }
 
+  // Always show the conversation list on mobile, hide individual chat when tab changes
   if (selectedConversation) {
     return (
-      <ChatArea
-        selectedConversation={selectedConversation}
-        setSelectedConversation={setSelectedConversation}
-        conversations={conversations}
-        setConversations={setConversations}
-        messages={messages}
-        setMessages={setMessages}
-        typingUsers={typingUsers}
-        markAsRead={markAsRead}
-        sendTypingIndicator={sendTypingIndicator}
-        session={session}
-      />
+      <div className="h-full w-full overflow-hidden">
+        <ChatArea
+          selectedConversation={selectedConversation}
+          setSelectedConversation={setSelectedConversation}
+          conversations={conversations}
+          setConversations={setConversations}
+          messages={messages}
+          setMessages={setMessages}
+          typingUsers={typingUsers}
+          markAsRead={markAsRead}
+          sendTypingIndicator={sendTypingIndicator}
+          session={session}
+        />
+      </div>
     )
   }
 
   return (
-    <div className="w-full bg-white flex flex-col h-full">
+    <div className="w-full bg-white flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-xl font-semibold text-gray-900">Messages</h1>
           <Button

@@ -1,45 +1,45 @@
 'use client'
 
+import { memo } from 'react'
 import { Button } from '@/components/ui/button'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Smile } from 'lucide-react'
+
+const EMOJI_CATEGORIES = {
+  'Smileys': ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳'],
+  'Gestures': ['👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👋', '🤚', '🖐', '✋', '🖖', '👏', '🙌', '🤲', '🤝', '🙏'],
+  'Hearts': ['❤️', '🧡', '💛', '💚', '💙', '💜', '🤎', '🖤', '🤍', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟'],
+  'Objects': ['📱', '💻', '⌨️', '🖥️', '🖨️', '🖱️', '🖲️', '💽', '💾', '💿', '📀', '📼', '📷', '📸', '📹', '🎥', '📽️', '🎞️', '📞', '☎️']
+}
 
 interface EmojiPickerProps {
-  isOpen: boolean
-  onToggle: () => void
-  onSelect: (emoji: string) => void
+  onEmojiSelect: (emoji: string) => void
 }
 
-const commonEmojis = [
-  '👍', '👎', '❤️', '😊', '😂', '😢', '😮', '😡', 
-  '🙏', '👏', '🔥', '💯', '🎉', '🤝', '💪', '🌟'
-]
-
-export function EmojiPicker({ isOpen, onToggle, onSelect }: EmojiPickerProps) {
+export const EmojiPicker = memo(({ onEmojiSelect }: EmojiPickerProps) => {
   return (
-    <Popover open={isOpen} onOpenChange={onToggle}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm">
-          <Smile className="h-4 w-4 mr-1" />
-          React
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-64 p-2" align="start">
-        <div className="grid grid-cols-8 gap-1">
-          {commonEmojis.map((emoji) => (
-            <button
-              key={emoji}
-              onClick={() => {
-                onSelect(emoji)
-                onToggle()
-              }}
-              className="p-2 hover:bg-gray-100 rounded text-lg flex items-center justify-center"
-            >
-              {emoji}
-            </button>
-          ))}
+    <div className="grid grid-cols-8 gap-1 p-3 max-h-48 overflow-y-auto">
+      {Object.entries(EMOJI_CATEGORIES).map(([category, emojis]) => (
+        <div key={category} className="col-span-8">
+          <h4 className="text-xs font-medium text-gray-600 mb-2">{category}</h4>
+          <div className="grid grid-cols-8 gap-1 mb-3">
+            {emojis.map((emoji) => (
+              <Button
+                key={emoji}
+                variant="ghost"
+                size="sm"
+                className="p-1 h-8 w-8 text-lg hover:bg-gray-100"
+                onClick={() => onEmojiSelect(emoji)}
+              >
+                {emoji}
+              </Button>
+            ))}
+          </div>
         </div>
-      </PopoverContent>
-    </Popover>
+      ))}
+    </div>
   )
-}
+})
+
+EmojiPicker.displayName = 'EmojiPicker'
+
+EmojiPicker.displayName = 'EmojiPicker'
+

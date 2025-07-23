@@ -12,7 +12,6 @@ import { toast } from 'sonner'
 export function NotificationSettings() {
   const {
     permission,
-    isSupported,
     soundEnabled,
     requestPermission,
     setSoundEnabled,
@@ -26,6 +25,9 @@ export function NotificationSettings() {
       toast.error('Notifications denied. You can enable them in your browser settings.')
     }
   }
+
+  // Check if notifications are supported in the browser
+  const isSupported = typeof window !== 'undefined' && 'Notification' in window
 
   if (!isSupported) {
     return (

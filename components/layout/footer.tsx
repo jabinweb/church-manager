@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { useSystemSettings } from '@/lib/useSystemSettings'
+import { useSystemSettings } from '@/lib/hooks/useSystemSettings'
 import { 
   FacebookIcon, 
   TwitterIcon, 

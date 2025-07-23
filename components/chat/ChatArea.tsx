@@ -4,13 +4,42 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
-import { MessageCircle, Send, Loader2, MoreVertical, Check, CheckCheck, Clock, ArrowLeft, X, Reply, Trash2 } from 'lucide-react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { 
+  MessageCircle, 
+  Send, 
+  Loader2, 
+  MoreVertical, 
+  ArrowLeft, 
+  X, 
+  Reply, 
+  Trash2, 
+  Smile, 
+  Paperclip, 
+  Phone,
+  Video,
+  Info
+} from 'lucide-react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { MessageContextMenu } from './MessageContextMenu'
+import { EmojiPicker } from './EmojiPicker'
+import { useChatState } from './hooks/useChatState'
+import { 
+  getConversationName, 
+  getConversationAvatar, 
+  getParticipantCount, 
+  getTypingUsers 
+} from './utils/conversationHelpers'
+import { 
+  getMessageStatus, 
+  renderMessageStatus, 
+  createTempMessage 
+} from './utils/messageHelpers'
 import type { Conversation, Message } from '@/lib/types/messaging'
+import { MessageItem } from './MessageItem'
 
 interface ChatAreaProps {
   selectedConversation: Conversation | null
@@ -37,17 +66,27 @@ export function ChatArea({
   sendTypingIndicator,
   session
 }: ChatAreaProps) {
-  const [newMessage, setNewMessage] = useState('')
-  const [messagesLoading, setMessagesLoading] = useState(false)
-  const [sending, setSending] = useState(false)
-  const [isTyping, setIsTyping] = useState(false)
-  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null)
-  const [pendingMessages, setPendingMessages] = useState<Set<string>>(new Set())
-  const [replyingTo, setReplyingTo] = useState<Message | null>(null)
-  const [editingMessage, setEditingMessage] = useState<{
-    id: string
-    content: string
-  } | null>(null)
+  const {
+    newMessage,
+    setNewMessage,
+    messagesLoading,
+    setMessagesLoading,
+    sending,
+    setSending,
+    isTyping,
+    setIsTyping,
+    pendingMessages,
+    replyingTo,
+    setReplyingTo,
+    showEmojiPicker,
+    setShowEmojiPicker,
+    showInfo,
+    setShowInfo,
+    resetReply,
+    addPendingMessage,
+    removePendingMessage,
+    handleTyping
+  } = useChatState()
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -72,7 +111,7 @@ export function ChatArea({
     } finally {
       setMessagesLoading(false)
     }
-  }, [markAsRead, setConversations, setMessages])
+  }, [markAsRead, setConversations, setMessages, setMessagesLoading])
 
   useEffect(() => {
     if (selectedConversation) {
@@ -87,7 +126,6 @@ export function ChatArea({
   }, [])
 
   useEffect(() => {
-    // Use a slight delay to ensure DOM is updated before scrolling
     const timer = setTimeout(() => {
       scrollToBottom()
     }, 50)
@@ -99,7 +137,7 @@ export function ChatArea({
     if (selectedConversation && typingUsers.size > 0) {
       const hasTypingInCurrentConversation = Array.from(typingUsers).some(userId => 
         userId !== session?.user?.id && 
-        selectedConversation.participants.some(p => p.userId === userId) // Fixed: use userId instead of id
+        selectedConversation.participants.some(p => p.userId === userId)
       )
       
       if (hasTypingInCurrentConversation) {
@@ -108,37 +146,11 @@ export function ChatArea({
     }
   }, [typingUsers, selectedConversation, session?.user?.id, scrollToBottom])
 
-  // Also scroll when selectedConversation changes
   useEffect(() => {
     if (selectedConversation) {
-      // Delay to ensure messages are loaded
       setTimeout(scrollToBottom, 200)
     }
   }, [selectedConversation, scrollToBottom])
-
-  const handleTyping = useCallback((value: string) => {
-    setNewMessage(value)
-    
-    if (!selectedConversation) return
-
-    if (value.trim() && !isTyping) {
-      setIsTyping(true)
-      sendTypingIndicator(selectedConversation.id, true)
-    }
-
-    if (typingTimeout) {
-      clearTimeout(typingTimeout)
-    }
-
-    const timeout = setTimeout(() => {
-      if (isTyping) {
-        setIsTyping(false)
-        sendTypingIndicator(selectedConversation.id, false)
-      }
-    }, 2000)
-
-    setTypingTimeout(timeout)
-  }, [selectedConversation, isTyping, sendTypingIndicator, typingTimeout])
 
   const handleDeleteMessage = async (messageId: string) => {
     if (!selectedConversation) return
@@ -173,10 +185,8 @@ export function ChatArea({
   const handleEditMessage = (messageId: string) => {
     const message = messages.find(m => m.id === messageId)
     if (message) {
-      setEditingMessage({
-        id: messageId,
-        content: message.content
-      })
+      setNewMessage(message.content)
+      setReplyingTo(message)
     }
   }
 
@@ -205,13 +215,9 @@ export function ChatArea({
     }
 
     try {
-      console.log(`Attempting to delete conversation: ${selectedConversation.id}`)
-      
       const response = await fetch(`/api/messages/conversations/${selectedConversation.id}`, {
         method: 'DELETE'
       })
-
-      console.log(`Delete response status: ${response.status}`)
 
       if (response.ok) {
         toast.success('Conversation deleted successfully')
@@ -223,7 +229,6 @@ export function ChatArea({
         setSelectedConversation(null)
       } else {
         const errorData = await response.json()
-        console.error('Delete conversation error:', errorData)
         toast.error(errorData.error || 'Failed to delete conversation')
       }
     } catch (error) {
@@ -232,44 +237,10 @@ export function ChatArea({
     }
   }
 
-  const cancelReply = () => {
-    setReplyingTo(null)
-  }
-
-  const cancelEdit = () => {
-    setEditingMessage(null)
-  }
-
-  const saveEditedMessage = async () => {
-    if (!editingMessage || !editingMessage.content.trim()) return
-
-    try {
-      const response = await fetch(`/api/messages/${editingMessage.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: editingMessage.content.trim()
-        })
-      })
-
-      if (response.ok) {
-        const updatedMessage = await response.json()
-        
-        // Update message in local state
-        setMessages((prev: Message[]) => prev.map((msg: Message) => 
-          msg.id === editingMessage.id ? updatedMessage.message : msg
-        ))
-        
-        setEditingMessage(null)
-        toast.success('Message updated successfully')
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to update message')
-      }
-    } catch (error) {
-      console.error('Error updating message:', error)
-      toast.error('Failed to update message')
-    }
+  const addEmoji = (emoji: string) => {
+    setNewMessage(prev => prev + emoji)
+    setShowEmojiPicker(false)
+    messageInputRef.current?.focus()
   }
 
   const sendMessage = async () => {
@@ -281,39 +252,15 @@ export function ChatArea({
     }
 
     const messageContent = newMessage.trim()
-    const replyToId = replyingTo?.id || undefined // Changed from null to undefined
+    const replyToId = replyingTo?.id || undefined
     
-    // Create temporary message for instant display
-    const tempMessage: Message = {
-      id: `temp-${Date.now()}`,
-      content: messageContent,
-      type: 'TEXT' as any,
-      senderId: session?.user?.id || '',
-      conversationId: selectedConversation.id,
-      replyToId,
-      metadata: undefined, // Changed from null to undefined
-      isPinned: false,
-      isEdited: false,
-      editedAt: undefined, // Changed from null to undefined
-      readBy: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      sender: {
-        id: session?.user?.id || '',
-        name: session?.user?.name || null,
-        image: session?.user?.image || null,
-        role: session?.user?.role || ''
-      },
-      replyTo: replyingTo || undefined,
-      replies: [],
-      reactions: []
-    }
+    const tempMessage = createTempMessage(messageContent, selectedConversation, replyingTo, session)
 
     setMessages((prev: Message[]) => [...prev, tempMessage])
-    setPendingMessages(prev => new Set([...Array.from(prev), tempMessage.id]))
+    addPendingMessage(tempMessage.id)
     
     setNewMessage('')
-    setReplyingTo(null)
+    resetReply()
     setTimeout(scrollToBottom, 10)
 
     setSending(true)
@@ -334,11 +281,7 @@ export function ChatArea({
         setMessages((prev: Message[]) => prev.map((msg: Message) => 
           msg.id === tempMessage.id ? data.message : msg
         ))
-        setPendingMessages(prev => {
-          const newSet = new Set(Array.from(prev))
-          newSet.delete(tempMessage.id)
-          return newSet
-        })
+        removePendingMessage(tempMessage.id)
         
         setConversations((prev: Conversation[]) => prev.map((conv: Conversation) => 
           conv.id === selectedConversation.id 
@@ -350,13 +293,8 @@ export function ChatArea({
           messageInputRef.current?.focus()
         }, 10)
       } else {
-        // Remove failed message and restore reply state
         setMessages((prev: Message[]) => prev.filter((msg: Message) => msg.id !== tempMessage.id))
-        setPendingMessages(prev => {
-          const newSet = new Set(Array.from(prev))
-          newSet.delete(tempMessage.id)
-          return newSet
-        })
+        removePendingMessage(tempMessage.id)
         
         setNewMessage(messageContent)
         if (replyToId) {
@@ -368,13 +306,8 @@ export function ChatArea({
         toast.error(error.error || 'Failed to send message')
       }
     } catch (error) {
-      // Handle error similar to above
       setMessages((prev: Message[]) => prev.filter((msg: Message) => msg.id !== tempMessage.id))
-      setPendingMessages(prev => {
-        const newSet = new Set(Array.from(prev))
-        newSet.delete(tempMessage.id)
-        return newSet
-      })
+      removePendingMessage(tempMessage.id)
       
       console.error('Error sending message:', error)
       toast.error('Failed to send message')
@@ -383,40 +316,37 @@ export function ChatArea({
     }
   }
 
-  const getMessageStatus = (message: Message) => {
-    if (message.senderId !== session?.user?.id) return null
-    
-    if (pendingMessages.has(message.id)) {
-      return 'pending'
-    }
-    
-    if (message.readBy && message.readBy.length > 0) {
-      return 'read'
-    }
-    
-    return 'delivered'
-  }
+  const handleReactionToggle = async (messageId: string, emoji: string) => {
+    try {
+      const response = await fetch(`/api/messages/${messageId}/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emoji })
+      })
 
-  const renderMessageStatus = (status: string | null) => {
-    switch (status) {
-      case 'pending':
-        return <Clock className="h-3 w-3 opacity-50" />
-      case 'delivered':
-        return <Check className="h-3 w-3" />
-      case 'read':
-        return <CheckCheck className="h-3 w-3" />
-      default:
-        return null
-    }
-  }
+      if (response.ok) {
+        const data = await response.json()
+        
+        // Update the message with new reactions
+        setMessages((prev: Message[]) => prev.map((msg: Message) => 
+          msg.id === messageId 
+            ? { ...msg, reactions: data.reactions }
+            : msg
+        ))
 
-  const getOtherParticipant = (conversation: Conversation) => {
-    return conversation.participants.find(p => p.userId !== session?.user?.id)
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Failed to update reaction')
+      }
+    } catch (error) {
+      console.error('Error toggling reaction:', error)
+      toast.error('Failed to update reaction')
+    }
   }
 
   if (!selectedConversation) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-500">
+      <div className="flex-1 flex items-center justify-center text-gray-500 h-full">
         <div className="text-center">
           <MessageCircle className="h-16 w-16 mx-auto mb-4 text-gray-400" />
           <h3 className="text-xl font-semibold mb-2">Select a conversation</h3>
@@ -426,195 +356,264 @@ export function ChatArea({
     )
   }
 
-  const otherParticipant = getOtherParticipant(selectedConversation)
-  const conversationName = selectedConversation.name || otherParticipant?.user?.name || 'Unknown User'
+  const conversationName = getConversationName(selectedConversation, session?.user?.id)
+  const conversationAvatar = getConversationAvatar(selectedConversation, session?.user?.id)
+  const participantCount = getParticipantCount(selectedConversation)
+  const typingUsersList = getTypingUsers(selectedConversation, typingUsers, session?.user?.id)
 
   return (
-    <div className="flex-1 flex flex-col h-full max-h-screen">
+    <div className="flex flex-col justify-between h-full relative overflow-hidden">
       {/* Chat Header */}
-      <div className="p-4 border-b border-gray-200 bg-white flex-shrink-0">
+      <div className="p-3 md:p-4 border-b border-gray-200 bg-white flex-shrink-0 relative z-10">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 md:space-x-3 flex-1 min-w-0">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setSelectedConversation(null)}
-              className="p-2 md:hidden"
+              className="p-2 lg:hidden flex-shrink-0"
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            {selectedConversation.imageUrl || otherParticipant?.user?.image ? (
+            
+            {/* Avatar */}
+            {conversationAvatar ? (
               <Image
-                src={selectedConversation.imageUrl || otherParticipant?.user?.image || ''}
+                src={conversationAvatar}
                 alt={conversationName}
-                width={32}
-                height={32}
-                className="w-8 h-8 rounded-full object-cover"
+                width={40}
+                height={40}
+                className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover flex-shrink-0"
               />
             ) : (
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center">
-                <span className="text-white font-semibold text-sm">
+              <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-semibold text-xs md:text-sm">
                   {conversationName.charAt(0).toUpperCase()}
                 </span>
               </div>
             )}
-            <h2 className="font-semibold text-gray-900">
-              {conversationName}
-            </h2>
+            
+            {/* Conversation Info */}
+            <div className="flex-1 min-w-0">
+              <h2 className="font-semibold text-gray-900 flex items-center text-sm md:text-base truncate">
+                <span className="truncate">{conversationName}</span>
+                {selectedConversation.type !== 'DIRECT' && (
+                  <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full flex-shrink-0 hidden sm:inline">
+                    {participantCount} members
+                  </span>
+                )}
+              </h2>
+              
+              {/* Typing indicator or status */}
+              <div className="text-xs md:text-sm text-gray-500 truncate">
+                {typingUsersList.length > 0 ? (
+                  <div className="flex items-center space-x-1">
+                    <div className="flex space-x-1">
+                      <div className="w-1 h-1 bg-green-500 rounded-full animate-bounce"></div>
+                      <div className="w-1 h-1 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-1 h-1 bg-green-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                    <span className="truncate">
+                      {typingUsersList.length === 1 
+                        ? `${typingUsersList[0]} is typing...`
+                        : `${typingUsersList.length} people are typing...`
+                      }
+                    </span>
+                  </div>
+                ) : selectedConversation.type === 'DIRECT' ? (
+                  'Online'
+                ) : (
+                  <span className="truncate">{participantCount} members</span>
+                )}
+              </div>
+            </div>
           </div>
           
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem>View Profile</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                className="text-red-600 focus:text-red-600"
-                onClick={handleDeleteConversation} // Fixed: call the function instead of empty handler
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Conversation
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Header Actions */}
+          <div className="flex items-center space-x-1 md:space-x-2 flex-shrink-0">
+            {selectedConversation.type === 'DIRECT' && (
+              <>
+                <Button variant="ghost" size="sm" className="p-2 hidden sm:flex">
+                  <Phone className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm" className="p-2 hidden sm:flex">
+                  <Video className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+            
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="p-2 hidden md:flex"
+              onClick={() => setShowInfo(!showInfo)}
+            >
+              <Info className="h-4 w-4" />
+            </Button>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="p-2">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem>View Profile</DropdownMenuItem>
+                <DropdownMenuItem>Search Messages</DropdownMenuItem>
+                <DropdownMenuItem>Mute Notifications</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  className="text-red-600 focus:text-red-600"
+                  onClick={handleDeleteConversation}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Conversation
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
-      {/* Messages */}
+      {/* Messages Container */}
       <div 
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-4 h-auto space-y-4 min-h-0 scroll-smooth"
-        style={{ 
-          height: 'calc(85vh - 140px)',
-          maxHeight: 'calc(85vh - 140px)',
-          scrollBehavior: 'smooth'
+        className="absolute inset-0 top-[80px] bottom-[80px] overflow-y-auto"
+        style={{
+          top: '80px',
+          bottom: replyingTo ? '140px' : '80px',
         }}
       >
-        {messagesLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
-          </div>
-        ) : (
-          <>
-            {messages.map((message) => {
-              const messageStatus = getMessageStatus(message)
-              const isPending = pendingMessages.has(message.id)
-              const isEditing = editingMessage?.id === message.id
-              
-              return (
-                <div
-                  key={message.id}
-                  className={cn(
-                    "flex",
-                    message.senderId === session?.user?.id ? "justify-end" : "justify-start"
-                  )}
-                >
-                  <MessageContextMenu
+        <div className="flex flex-col justify-end min-h-full p-3 md:p-4 space-y-3 md:space-y-4">
+          {messagesLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
+            </div>
+          ) : (
+            <>
+              {messages.map((message, index) => {
+                const messageStatus = getMessageStatus(message, selectedConversation, pendingMessages, session?.user?.id)
+                const isPending = pendingMessages.has(message.id)
+                
+                return (
+                  <MessageItem
+                    key={message.id}
                     message={message}
-                    isOwnMessage={message.senderId === session?.user?.id}
+                    previousMessage={messages[index - 1]}
+                    conversation={selectedConversation}
+                    session={session}
+                    isPending={isPending}
+                    messageStatus={messageStatus}
                     onDelete={handleDeleteMessage}
                     onReply={handleReplyToMessage}
-                    onCopy={handleCopyText}
                     onEdit={handleEditMessage}
-                  >
-                    <div
-                      className={cn(
-                        "max-w-xs lg:max-w-md px-4 py-2 rounded-lg transition-opacity cursor-pointer group",
-                        message.senderId === session?.user?.id
-                          ? "bg-purple-600 text-white"
-                          : "bg-gray-200 text-gray-900",
-                        isPending && "opacity-70"
-                      )}
-                    >
-                      <p className="break-words">{message.content}</p>
-                      <div className={cn(
-                        "flex items-center justify-end mt-1 space-x-1",
-                        message.senderId === session?.user?.id ? "text-purple-200" : "text-gray-500"
-                      )}>
-                        <span className="text-xs">
-                          {format(new Date(message.createdAt), 'HH:mm')}
-                        </span>
-                        {messageStatus && renderMessageStatus(messageStatus)}
-                      </div>
+                    onCopy={handleCopyText}
+                    onReactionToggle={handleReactionToggle}
+                    renderMessageStatus={renderMessageStatus}
+                  />
+                )
+              })}
+              
+              {/* Typing indicator */}
+              {typingUsersList.length > 0 && (
+                <div className="flex justify-start flex-shrink-0">
+                  <div className="bg-gray-200 text-gray-900 px-3 py-2 md:px-4 md:py-2 rounded-lg">
+                    <div className="flex space-x-1 items-center">
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <span className="text-xs text-gray-600 ml-2">
+                        {typingUsersList.length === 1 
+                          ? `${typingUsersList[0]} is typing...`
+                          : `${typingUsersList.length} people are typing...`
+                        }
+                      </span>
                     </div>
-                  </MessageContextMenu>
-                </div>
-              )
-            })}
-            
-            {/* Typing indicator */}
-            {Array.from(typingUsers).some(userId => 
-              userId !== session?.user?.id && 
-              selectedConversation.participants.some(p => p.userId === userId) // Fixed: use userId instead of id
-            ) && (
-              <div className="flex justify-start">
-                <div className="bg-gray-200 text-gray-900 px-4 py-2 rounded-lg">
-                  <div className="flex space-x-1 items-center">
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    <span className="text-xs text-gray-600 ml-2">typing...</span>
                   </div>
                 </div>
-              </div>
-            )}
-            
-            <div ref={messagesEndRef} style={{ height: '1px' }} />
-          </>
-        )}
+              )}
+              
+              <div ref={messagesEndRef} className="h-1 flex-shrink-0" />
+            </>
+          )}
+        </div>
       </div>
-
+      
       {/* Reply indicator */}
       {replyingTo && (
-        <div className="px-4 py-2 bg-gray-100 border-t border-gray-200 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Reply className="h-4 w-4 text-gray-500" />
-            <div>
+        <div className="px-3 py-2 md:px-4 md:py-2 bg-gray-100 border-t border-gray-200 flex items-center justify-between flex-shrink-0 z-20">
+          <div className="flex items-center space-x-2 min-w-0 flex-1">
+            <Reply className="h-4 w-4 text-gray-500 flex-shrink-0" />
+            <div className="min-w-0 flex-1">
               <span className="text-sm font-medium text-gray-700">Replying to {replyingTo.sender?.name}</span>
-              <p className="text-xs text-gray-600 truncate max-w-xs">{replyingTo.content}</p>
+              <p className="text-xs text-gray-600 truncate">{replyingTo.content}</p>
             </div>
           </div>
-          <Button size="sm" variant="ghost" onClick={() => setReplyingTo(null)}>
+          <Button size="sm" variant="ghost" onClick={resetReply} className="flex-shrink-0">
             <X className="h-4 w-4" />
           </Button>
         </div>
       )}
 
       {/* Message Input */}
-      <div className="p-4 border-t border-gray-200 bg-white">
-        <div className="flex space-x-2">
-          <Input
-            ref={messageInputRef}
-            value={newMessage}
-            onChange={(e) => handleTyping(e.target.value)}
-            placeholder={replyingTo ? "Reply to message..." : "Type a message..."}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                sendMessage()
-              }
-            }}
-            className="flex-1 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            disabled={sending}
-            autoFocus={!!selectedConversation}
-          />
+      <div className="p-3 md:p-4 border-t border-gray-200 bg-white flex-shrink-0 z-20">
+        <div className="flex items-end space-x-2">
+          {/* Attachment button */}
+          <Button variant="ghost" size="sm" className="p-2 self-end flex-shrink-0">
+            <Paperclip className="h-4 w-4" />
+          </Button>
+
+          {/* Message input container */}
+          <div className="flex-1 relative">
+            <Input
+              ref={messageInputRef}
+              value={newMessage}
+              onChange={(e) => handleTyping(e.target.value, selectedConversation, sendTypingIndicator)}
+              placeholder={replyingTo ? "Reply to message..." : "Type a message..."}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  sendMessage()
+                }
+              }}
+              className="flex-1 focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-10 text-sm md:text-base"
+              disabled={sending}
+              autoFocus={!!selectedConversation}
+            />
+            
+            {/* Emoji picker */}
+            <Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1"
+                >
+                  <Smile className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" side="top">
+                <EmojiPicker onEmojiSelect={addEmoji} />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Send button */}
           <Button
             onClick={sendMessage}
             disabled={(!newMessage.trim() && !replyingTo) || sending}
-            className="bg-purple-600 hover:bg-purple-700"
+            className="bg-purple-600 hover:bg-purple-700 self-end flex-shrink-0"
+            size="sm"
           >
             {sending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Send className="h-4 w-4" />
             )}
-          </Button>
+            </Button>
         </div>
       </div>
     </div>
   )
 }
+              

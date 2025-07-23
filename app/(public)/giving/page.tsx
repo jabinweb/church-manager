@@ -9,7 +9,7 @@ import { Loader2, DollarSign, Gift, Users, TrendingUp, Heart, Shield, CreditCard
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { useSession } from 'next-auth/react'
-import { useSystemSettings } from '@/lib/useSystemSettings'
+import { useSystemSettings } from '@/lib/hooks/useSystemSettings'
 import Script from 'next/script'
 import { motion } from 'framer-motion'
 

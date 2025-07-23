@@ -8,7 +8,7 @@ import { ShoppingCart, X, Plus, Minus } from 'lucide-react'
 import { cartManager, type CartItem } from '@/lib/cart'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { useSystemSettings } from '@/lib/useSystemSettings'
+import { useSystemSettings } from '@/lib/hooks/useSystemSettings'
 
 export default function CartSidebar() {
   const [cart, setCart] = useState<CartItem[]>([])

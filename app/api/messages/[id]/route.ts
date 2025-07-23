@@ -19,7 +19,17 @@ export async function DELETE(
       where: { id },
       include: {
         sender: true,
-        receiver: true
+        conversation: {
+          include: {
+            participants: {
+              include: {
+                user: {
+                  select: { id: true, name: true, image: true }
+                }
+              }
+            }
+          }
+        }
       }
     })
 
@@ -66,7 +76,17 @@ export async function PATCH(
       where: { id },
       include: {
         sender: true,
-        receiver: true
+        conversation: {
+          include: {
+            participants: {
+              include: {
+                user: {
+                  select: { id: true, name: true, image: true }
+                }
+              }
+            }
+          }
+        }
       }
     })
 
@@ -88,14 +108,31 @@ export async function PATCH(
     const updatedMessage = await prisma.message.update({
       where: { id },
       data: {
-        content: content.trim()
+        content: content.trim(),
+        isEdited: true,
+        editedAt: new Date()
       },
       include: {
         sender: {
-          select: { id: true, name: true, image: true }
+          select: { id: true, name: true, image: true, role: true }
         },
-        receiver: {
-          select: { id: true, name: true, image: true }
+        conversation: {
+          include: {
+            participants: {
+              include: {
+                user: {
+                  select: { id: true, name: true, image: true }
+                }
+              }
+            }
+          }
+        },
+        reactions: {
+          include: {
+            user: {
+              select: { id: true, name: true, image: true }
+            }
+          }
         }
       }
     })

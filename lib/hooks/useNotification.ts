@@ -1,114 +1,141 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { notificationService, NotificationOptions } from '@/lib/services/notification'
 
-export interface UseNotificationReturn {
-  permission: NotificationPermission
-  isSupported: boolean
-  isWindowFocused: boolean
-  soundEnabled: boolean
-  requestPermission: () => Promise<NotificationPermission>
-  showNotification: (options: NotificationOptions) => Promise<Notification | null>
-  showMessageNotification: (senderName: string, message: string, senderImage?: string, conversationId?: string) => Promise<Notification | null>
-  showSystemNotification: (title: string, message: string, type?: 'info' | 'success' | 'warning' | 'error') => Promise<Notification | null>
-  playSound: (options?: { frequency?: number; duration?: number; volume?: number }) => void
-  setSoundEnabled: (enabled: boolean) => void
-  clearAll: () => void
-}
-
-export function useNotification(): UseNotificationReturn {
+export function useNotification() {
   const [permission, setPermission] = useState<NotificationPermission>('default')
-  const [isSupported, setIsSupported] = useState(false)
   const [isWindowFocused, setIsWindowFocused] = useState(true)
-  const [soundEnabled, setSoundEnabledState] = useState(true)
-
-  const requestPermission = useCallback(async (): Promise<NotificationPermission> => {
-    const newPermission = await notificationService.requestPermission()
-    setPermission(newPermission)
-    return newPermission
-  }, [])
+  const [soundEnabled, setSoundEnabled] = useState(true)
 
   useEffect(() => {
-    // Initialize state from service
-    setPermission(notificationService.getPermission())
-    setIsSupported(notificationService.isSupported())
-    setIsWindowFocused(notificationService.isWindowInFocus())
+    // Check initial notification permission
+    if ('Notification' in window) {
+      setPermission(Notification.permission)
+    }
 
-    // Set up listeners for permission changes
+    // Track window focus
+    const handleFocus = () => {
+      console.log('Window focused')
+      setIsWindowFocused(true)
+    }
+    const handleBlur = () => {
+      console.log('Window blurred')
+      setIsWindowFocused(false)
+    }
     const handleVisibilityChange = () => {
-      setIsWindowFocused(notificationService.isWindowInFocus())
+      const isVisible = document.visibilityState === 'visible'
+      console.log('Visibility changed:', isVisible)
+      setIsWindowFocused(isVisible)
     }
 
-    // Listen for focus/blur events
-    window.addEventListener('focus', handleVisibilityChange)
-    window.addEventListener('blur', handleVisibilityChange)
-
-    // Auto-request permission if default
-    if (notificationService.getPermission() === 'default') {
-      // Small delay to avoid immediate permission request
-      const timer = setTimeout(() => {
-        requestPermission()
-      }, 2000)
-      
-      return () => {
-        clearTimeout(timer)
-        window.removeEventListener('focus', handleVisibilityChange)
-        window.removeEventListener('blur', handleVisibilityChange)
-      }
-    }
+    window.addEventListener('focus', handleFocus)
+    window.addEventListener('blur', handleBlur)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
-      window.removeEventListener('focus', handleVisibilityChange)
-      window.removeEventListener('blur', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('blur', handleBlur)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [requestPermission])
-
-  const showNotification = useCallback(async (options: NotificationOptions): Promise<Notification | null> => {
-    return await notificationService.show(options)
   }, [])
 
-  const showMessageNotification = useCallback(async (
-    senderName: string, 
-    message: string, 
-    senderImage?: string, 
+  const requestPermission = useCallback(async (): Promise<NotificationPermission> => {
+    if (!('Notification' in window)) {
+      console.log('This browser does not support notifications')
+      return 'denied'
+    }
+
+    try {
+      const result = await Notification.requestPermission()
+      setPermission(result)
+      console.log('Notification permission result:', result)
+      return result
+    } catch (error) {
+      console.error('Error requesting notification permission:', error)
+      return 'denied'
+    }
+  }, [])
+
+  const showMessageNotification = useCallback((
+    title: string,
+    body: string,
+    icon?: string,
     conversationId?: string
-  ): Promise<Notification | null> => {
-    return await notificationService.showMessageNotification(senderName, message, senderImage, conversationId)
-  }, [])
+  ) => {
+    console.log('showMessageNotification called:', { title, body, icon, conversationId, permission, isWindowFocused })
+    
+    // Don't show notification if window is focused
+    if (isWindowFocused) {
+      console.log('Window is focused, skipping notification')
+      return
+    }
 
-  const showSystemNotification = useCallback(async (
-    title: string, 
-    message: string, 
-    type: 'info' | 'success' | 'warning' | 'error' = 'info'
-  ): Promise<Notification | null> => {
-    return await notificationService.showSystemNotification(title, message, type)
-  }, [])
+    // Check if notifications are supported and permitted
+    if (!('Notification' in window) || permission !== 'granted') {
+      console.log('Notifications not supported or not granted:', permission)
+      return
+    }
 
-  const playSound = useCallback((options?: { frequency?: number; duration?: number; volume?: number }): void => {
-    notificationService.playNotificationSound(options)
-  }, [])
+    try {
+      const notification = new Notification(title, {
+        body,
+        icon: icon || '/logo.png',
+        badge: '/logo.png',
+        tag: conversationId || 'message',
+        requireInteraction: false,
+        silent: !soundEnabled
+      })
 
-  const setSoundEnabled = useCallback((enabled: boolean): void => {
-    setSoundEnabledState(enabled)
-    notificationService.setSoundEnabled(enabled)
-  }, [])
+      console.log('Notification created:', notification)
 
-  const clearAll = useCallback((): void => {
-    notificationService.clearAllNotifications()
-  }, [])
+      // Handle notification click
+      notification.onclick = () => {
+        console.log('Notification clicked for conversation:', conversationId)
+        window.focus()
+        
+        // Focus the conversation if conversationId is provided
+        if (conversationId) {
+          // Dispatch custom event to focus conversation
+          window.dispatchEvent(new CustomEvent('focusConversation', {
+            detail: { conversationId }
+          }))
+        }
+        
+        notification.close()
+      }
+
+      // Auto close after 5 seconds
+      setTimeout(() => {
+        notification.close()
+      }, 5000)
+
+    } catch (error) {
+      console.error('Error showing notification:', error)
+    }
+  }, [permission, isWindowFocused, soundEnabled])
+
+  const playNotificationSound = useCallback(() => {
+    if (!soundEnabled) return
+
+    try {
+      // Create and play notification sound
+      const audio = new Audio('/notification.mp3') // Add a notification sound file
+      audio.volume = 0.5
+      audio.play().catch(error => {
+        console.log('Could not play notification sound:', error)
+      })
+    } catch (error) {
+      console.log('Error playing notification sound:', error)
+    }
+  }, [soundEnabled])
 
   return {
     permission,
-    isSupported,
     isWindowFocused,
-    soundEnabled,
     requestPermission,
-    showNotification,
     showMessageNotification,
-    showSystemNotification,
-    playSound,
-    setSoundEnabled,
-    clearAll
+    playNotificationSound,
+    soundEnabled,
+    setSoundEnabled
   }
 }

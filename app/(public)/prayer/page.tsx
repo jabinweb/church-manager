@@ -15,7 +15,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
-import { useSystemSettings } from '@/lib/useSystemSettings'
+import { useSystemSettings } from '@/lib/hooks/useSystemSettings'
 import { useSession } from 'next-auth/react'
 
 // Define form schema

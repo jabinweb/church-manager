@@ -25,7 +25,7 @@ import {
   Cross,
   Sparkles
 } from 'lucide-react'
-import { useSystemSettings } from '@/lib/useSystemSettings'
+import { useSystemSettings } from '@/lib/hooks/useSystemSettings'
 import { format } from 'date-fns'
 import SermonCard from '@/components/sermon/SermonCard'
 

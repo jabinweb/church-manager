@@ -131,10 +131,13 @@ export function ConversationList({
                   <p className="text-sm text-gray-600 truncate">
                     {lastMessagePreview}
                   </p>
+                  {/* Unread Count Badge */}
                   {conversation.unreadCount && conversation.unreadCount > 0 && (
-                    <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-purple-600 rounded-full">
-                      {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
-                    </span>
+                    <div className="flex items-center">
+                      <span className="bg-red-500 text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-2">
+                        {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>

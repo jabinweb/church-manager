@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import CartSidebar from '@/components/shop/CartSidebar'
-import { useSystemSettings } from '@/lib/useSystemSettings'
+import { useSystemSettings } from '@/lib/hooks/useSystemSettings'
 import Image from 'next/image'
 
 type UserRole = 'ADMIN' | 'PASTOR' | 'STAFF' | 'MEMBER' | 'CUSTOMER'

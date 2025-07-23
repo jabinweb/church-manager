@@ -84,9 +84,7 @@ export class MessagingService {
     })
 
     // Send real-time notification to the other user (receiver) about new conversation
-    const sseManager = SSEManager.getInstance()
-    
-    const success = sseManager.sendToUser(user2Id, {
+    const success = SSEManager.sendToUser(user2Id, {
       type: 'new_conversation',
       data: {
         conversation: newConversation,
@@ -190,7 +188,6 @@ export class MessagingService {
     console.log(`Broadcast channel created with ${conversation.participants.length} participants`)
 
     // Send real-time notification to all users about new broadcast channel
-    const sseManager = SSEManager.getInstance()
     const creatorUser = allUsers.find(u => u.id === creatorId)
     const creatorName = creatorUser?.name || 'Unknown'
 
@@ -200,13 +197,13 @@ export class MessagingService {
       .map(p => p.userId)
 
     console.log(`Sending broadcast notifications to ${participantIds.length} users`)
-    console.log('Active SSE connections:', sseManager.getConnectedUsers())
+    console.log('Active SSE connections:', SSEManager.getConnectedUsers())
 
     // Send notifications to all participants
     let successCount = 0
     participantIds.forEach(userId => {
       console.log(`Sending broadcast notification to user: ${userId}`)
-      const success = sseManager.sendToUser(userId, {
+      const success = SSEManager.sendToUser(userId, {
         type: 'new_broadcast_channel',
         data: {
           conversation,
@@ -311,69 +308,56 @@ export class MessagingService {
       data: { updatedAt: new Date() }
     })
 
-    // Get full conversation details for new conversation notifications
-    const fullConversation = await prisma.conversation.findUnique({
-      where: { id: conversationId },
-      include: {
-        participants: {
-          include: {
-            user: {
-              select: { id: true, name: true, email: true, image: true, role: true }
-            }
-          }
-        }
-      }
-    })
-
     // Send real-time message to all participants (except sender)
-    const sseManager = SSEManager.getInstance()
     const otherParticipants = message.conversation.participants
       .filter(p => p.userId !== senderId)
       .map(p => p.userId)
 
+    // Send message notification to each participant
+    let successCount = 0
     otherParticipants.forEach(userId => {
-      // Send regular message notification
-      sseManager.sendToUser(userId, {
+      console.log(`Attempting to send message to user: ${userId}`)
+      const success = SSEManager.sendToUser(userId, {
         type: 'new_message',
         data: { 
           message: {
             ...message,
-            conversation: undefined
+            conversation: undefined // Remove circular reference
           }
         }
       })
-
-      // Also send conversation update to ensure it appears in the list
-      if (fullConversation) {
-        sseManager.sendToUser(userId, {
-          type: 'conversation_updated',
-          data: {
-            conversation: {
-              ...fullConversation,
-              lastMessage: message,
-              unreadCount: 1 // New message means +1 unread
-            },
-            timestamp: new Date().toISOString()
-          }
-        })
+      if (success) {
+        successCount++
+        console.log(`Message notification sent successfully to user: ${userId}`)
+      } else {
+        console.log(`Failed to send message notification to user: ${userId}`)
       }
     })
 
-    // For broadcast messages, send special notification
+    console.log(`Message notifications sent successfully to ${successCount}/${otherParticipants.length} participants`)
+
+    // For broadcast messages, send special notification with channel info
     if (message.conversation.type === 'BROADCAST') {
+      const broadcastConversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { name: true, type: true }
+      })
+
       otherParticipants.forEach(userId => {
-        sseManager.sendToUser(userId, {
+        SSEManager.sendToUser(userId, {
           type: 'new_broadcast_message',
           data: {
             message: {
               ...message,
               conversation: undefined
             },
-            channelName: message.conversation.name,
+            channelName: broadcastConversation?.name || 'Broadcast Channel',
             timestamp: new Date().toISOString()
           }
         })
       })
+
+      console.log(`Broadcast message notifications sent to ${otherParticipants.length} participants`)
     }
 
     return message
@@ -398,22 +382,31 @@ export class MessagingService {
 
   // Message reactions
   static async toggleReaction(messageId: string, userId: string, emoji: string) {
-    const existing = await prisma.messageReaction.findUnique({
+    // Check if user has any existing reaction on this message
+    const existing = await prisma.messageReaction.findFirst({
       where: {
-        messageId_userId_emoji: {
-          messageId,
-          userId,
-          emoji
-        }
+        messageId,
+        userId
       }
     })
 
     if (existing) {
-      await prisma.messageReaction.delete({
-        where: { id: existing.id }
-      })
-      return { action: 'removed' }
+      if (existing.emoji === emoji) {
+        // Same emoji - remove the reaction
+        await prisma.messageReaction.delete({
+          where: { id: existing.id }
+        })
+        return { action: 'removed' }
+      } else {
+        // Different emoji - update the existing reaction
+        await prisma.messageReaction.update({
+          where: { id: existing.id },
+          data: { emoji }
+        })
+        return { action: 'changed' }
+      }
     } else {
+      // No existing reaction - create new one
       await prisma.messageReaction.create({
         data: { messageId, userId, emoji }
       })
@@ -503,13 +496,17 @@ export class MessagingService {
 
     console.log(`Raw conversations found: ${conversations.length}`)
     
-    // Log each conversation type
+    // Log each conversation type with more detail
     conversations.forEach(conv => {
       console.log(`Conversation: ${conv.id}, Type: ${conv.type}, Name: ${conv.name}, Participants: ${conv.participants.length}`)
       
-      // Check if user is actually a participant
       const userParticipant = conv.participants.find(p => p.userId === userId)
       console.log(`User ${userId} participant status:`, userParticipant ? `Role: ${userParticipant.role}, Active: ${userParticipant.isActive}` : 'NOT FOUND')
+      
+      // Log conversation type specifically for broadcasts
+      if (conv.type === 'BROADCAST') {
+        console.log(`BROADCAST conversation found: ${conv.name} with ${conv.participants.length} participants`)
+      }
     })
 
     // Calculate unread counts
@@ -526,20 +523,35 @@ export class MessagingService {
           }
         })
 
-        return {
+        const result = {
           ...conv,
           lastMessage: conv.messages[0] || null,
           unreadCount
         }
+
+        // Log broadcast conversations with unread counts
+        if (conv.type === 'BROADCAST' && unreadCount > 0) {
+          console.log(`BROADCAST ${conv.name} has ${unreadCount} unread messages for user ${userId}`)
+        }
+
+        return result
       })
     )
 
     console.log(`Returning ${conversationsWithUnread.length} conversations with unread counts`)
     
+    // Log summary by type
+    const summary = conversationsWithUnread.reduce((acc, conv) => {
+      const type = conv.type || 'UNKNOWN'
+      acc[type] = (acc[type] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    console.log('Conversation summary by type:', summary)
+    
     return conversationsWithUnread
   }
 
-  // Mark messages as read
+  // Mark messages as read - enhanced to properly track read status
   static async markAsRead(conversationId: string, userId: string, messageId?: string) {
     // Update participant's last read timestamp
     await prisma.conversationParticipant.update({
@@ -554,16 +566,55 @@ export class MessagingService {
       }
     })
 
-    // If specific message provided, add to readBy array
-    if (messageId) {
+    // Mark all unread messages in the conversation as read by this user
+    const unreadMessages = await prisma.message.findMany({
+      where: {
+        conversationId,
+        senderId: { not: userId }, // Don't mark own messages as read
+        NOT: {
+          readBy: {
+            has: userId
+          }
+        }
+      }
+    })
+
+    // Update each unread message to include this user in readBy array
+    for (const message of unreadMessages) {
       await prisma.message.update({
-        where: { id: messageId },
+        where: { id: message.id },
         data: {
           readBy: {
-            push: userId
+            set: [...message.readBy, userId]
           }
         }
       })
     }
+
+    // Send read receipt notification to other participants
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        participants: {
+          where: { userId: { not: userId } },
+          select: { userId: true }
+        }
+      }
+    })
+
+    if (conversation) {
+      const sseManager = SSEManager
+      conversation.participants.forEach(participant => {
+        sseManager.sendToUser(participant.userId, {
+          type: 'messages_read',
+          data: {
+            conversationId,
+            readByUserId: userId,
+            timestamp: new Date().toISOString()
+          }
+        })
+      })
+    }
   }
 }
+

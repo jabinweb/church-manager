@@ -10,7 +10,7 @@ import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { cartManager } from '@/lib/cart'
-import { useSystemSettings } from '@/lib/useSystemSettings'
+import { useSystemSettings } from '@/lib/hooks/useSystemSettings'
 import { useEffect, useState } from 'react'
 
 interface Product {
