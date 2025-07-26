@@ -8,21 +8,13 @@ export async function GET() {
       where: { isPublished: true },
       orderBy: { date: 'desc' },
       take: 3,
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        speaker: true,
-        series: true,
-        date: true,
-        duration: true,
-        views: true,
-        isPublished: true,
-        audioUrl: true,
-        videoUrl: true,
-        scriptureReference: true,
-        tags: true,
-        // Add imageUrl if it exists in your schema, otherwise we'll use default
+      include: {
+        author: {
+          select: { name: true }
+        },
+        category: {
+          select: { name: true }
+        }
       }
     })
 
@@ -33,15 +25,7 @@ export async function GET() {
         startDate: { gte: new Date() }
       },
       orderBy: { startDate: 'asc' },
-      take: 3,
-      select: {
-        id: true,
-        title: true,
-        startDate: true,
-        location: true,
-        category: true,
-        imageUrl: true,
-      }
+      take: 3
     })
 
     // Fetch recent blog posts
@@ -56,12 +40,26 @@ export async function GET() {
       }
     })
 
-    // Get stats
+    // Fetch active ministries
+    const ministries = await prisma.ministry.findMany({
+      where: { isActive: true },
+      orderBy: { name: 'asc' },
+      take: 6
+    })
+
+    // Calculate stats
+    const [totalMembers, totalSermons, totalEvents, totalPrayerRequests] = await Promise.all([
+      prisma.user.count({ where: { isActive: true } }),
+      prisma.sermon.count({ where: { isPublished: true } }),
+      prisma.event.count({ where: { isPublished: true } }),
+      prisma.prayerRequest.count()
+    ])
+
     const stats = {
-      totalMembers: await prisma.user.count({ where: { role: 'MEMBER', isActive: true } }),
-      totalSermons: await prisma.sermon.count({ where: { isPublished: true } }),
-      totalEvents: await prisma.event.count({ where: { isPublished: true } }),
-      totalPrayerRequests: await prisma.prayerRequest.count()
+      totalMembers,
+      totalSermons,
+      totalEvents,
+      totalPrayerRequests
     }
 
     return NextResponse.json({
@@ -79,14 +77,16 @@ export async function GET() {
         ...post,
         publishDate: post.publishDate?.toISOString() || post.createdAt.toISOString()
       })),
+      ministries,
       stats
     })
   } catch (error) {
-    console.error('Error fetching homepage data:', error)
+    console.error('Homepage API error:', error)
     return NextResponse.json({ 
       recentSermons: [],
       upcomingEvents: [],
       recentPosts: [],
+      ministries: [],
       stats: {
         totalMembers: 0,
         totalSermons: 0,

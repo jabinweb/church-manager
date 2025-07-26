@@ -28,6 +28,7 @@ import {
 import { useSystemSettings } from '@/lib/hooks/useSystemSettings'
 import { format } from 'date-fns'
 import SermonCard from '@/components/sermon/SermonCard'
+import { MinistriesSection } from '@/components/layout/MinistriesSection'
 
 interface HomePageData {
   recentSermons: Array<{
@@ -63,6 +64,18 @@ interface HomePageData {
     author: { name?: string }
     imageUrl?: string
   }>
+  ministries: Array<{
+    id: string
+    name: string
+    description?: string
+    leader?: string
+    meetingTime?: string
+    location?: string
+    imageUrl?: string
+    isActive: boolean
+    createdAt: string
+    updatedAt: string
+  }>
   stats: {
     totalMembers: number
     totalSermons: number
@@ -94,40 +107,27 @@ export default function Home() {
     }
   }
 
-  const ministries = [
-    {
-      icon: Cross,
-      title: 'Discipleship',
-      description: 'Growing deeper in relationship with Jesus through intentional spiritual formation.',
-      image: '/images/discipleship.jpg',
-      link: '/ministries/discipleship',
-      verse: 'Matthew 28:19-20'
-    },
-    {
-      icon: Heart,
-      title: 'Youth Ministry',
-      description: 'Empowering young hearts to live boldly for Christ in today&apos;s world.',
-      image: '/images/youth-ministry.jpg',
-      link: '/ministries/youth',
-      verse: '1 Timothy 4:12'
-    },
-    {
-      icon: BookOpen,
-      title: 'Children&apos;s Ministry',
-      description: 'Teaching little ones about God&apos;s amazing love through engaging Bible stories.',
-      image: '/images/childrens-ministry.jpg',
-      link: '/ministries/children',
-      verse: 'Mark 10:14'
-    },
-    {
-      icon: HandHeart,
-      title: 'Outreach',
-      description: 'Sharing the Gospel and God&apos;s love with our community and beyond.',
-      image: '/images/outreach.jpg',
-      link: '/ministries/outreach',
-      verse: 'Matthew 28:19'
-    }
-  ]
+  // Safe data access
+  const stats = data?.stats || { totalMembers: 0, totalSermons: 0, totalEvents: 0, totalPrayerRequests: 0 }
+  const recentSermons = data?.recentSermons || []
+  const upcomingEvents = data?.upcomingEvents || []
+  const ministries = data?.ministries || []
+
+  // Helper function to get ministry icon based on name or default
+  const getMinistryIcon = (name: string) => {
+    const lowerName = name.toLowerCase()
+    if (lowerName.includes('youth')) return Heart
+    if (lowerName.includes('children') || lowerName.includes('kids')) return BookOpen
+    if (lowerName.includes('outreach') || lowerName.includes('mission')) return HandHeart
+    if (lowerName.includes('worship') || lowerName.includes('music')) return Music
+    if (lowerName.includes('prayer')) return Heart
+    return Cross // Default icon
+  }
+
+  // Helper function to get ministry link
+  const getMinistryLink = (ministry: any) => {
+    return `/ministries/${ministry.id}` // Use ID-based routing
+  }
 
   const serviceSchedule = [
     {
@@ -160,7 +160,7 @@ export default function Home() {
     {
       name: 'Sarah Johnson',
       role: 'Member since 2020',
-      content: 'Through this church, I\'ve experienced the transforming power of the Gospel firsthand. The community here truly lives out Christ&apos;s love.',
+      content: 'Through this church, I\'ve experienced the transforming power of the Gospel firsthand. The community here truly lives out Christ\'s love.',
       avatar: '/images/testimonial-1.jpg'
     },
     {
@@ -176,11 +176,6 @@ export default function Home() {
       avatar: '/images/testimonial-3.jpg'
     }
   ]
-
-  // Safe data access
-  const stats = data?.stats || { totalMembers: 0, totalSermons: 0, totalEvents: 0, totalPrayerRequests: 0 }
-  const recentSermons = data?.recentSermons || []
-  const upcomingEvents = data?.upcomingEvents || []
 
   return (
     <div className="min-h-screen bg-white">
@@ -390,67 +385,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Ministries - Improved Typography */}
-      <section className="py-16 lg:py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
-              Gospel-Centered Ministries
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto font-light">
-              Every ministry exists to make disciples who make disciples
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {ministries.map((ministry, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-              >
-                <Card className="h-full hover:shadow-lg transition-all duration-300 group overflow-hidden border-0">
-                  <div className="relative h-40 overflow-hidden">
-                    <Image
-                      src={ministry.image}
-                      alt={ministry.title}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.src = `https://placehold.co/400x300/7c3aed/white?text=${encodeURIComponent(ministry.title)}`
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <div className="absolute bottom-3 left-3 text-white">
-                      <ministry.icon className="h-6 w-6" />
-                    </div>
-                    <div className="absolute top-3 right-3">
-                      <Badge className="bg-white/90 text-gray-900 text-xs">
-                        {ministry.verse}
-                      </Badge>
-                    </div>
-                  </div>
-                  
-                  <CardContent className="p-5">
-                    <h3 className="text-lg font-bold mb-2 group-hover:text-purple-600 transition-colors">
-                      {ministry.title}
-                    </h3>
-                    <p className="text-gray-600 mb-4 text-sm leading-relaxed">{ministry.description}</p>
-                    <Button variant="outline" size="sm" className="group-hover:bg-purple-600 group-hover:text-white transition-colors text-xs" asChild>
-                      <Link href={ministry.link}>
-                        Learn More
-                        <ArrowRight className="ml-1 h-3 w-3" />
-                      </Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Ministries - Now using separate component */}
+      <MinistriesSection ministries={ministries} />
 
       {/* Testimonials - Refined */}
       <section className="py-16 lg:py-20 bg-gradient-to-r from-purple-600 to-blue-600 text-white">

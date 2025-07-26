@@ -24,6 +24,8 @@ import {
   ChevronUp,
   Store,
   CreditCard,
+  X,
+  Menu
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState, useEffect } from 'react'
@@ -128,7 +130,12 @@ const adminMenuGroups: MenuGroup[] = [
   }
 ]
 
-export function AdminNavigation() {
+interface AdminNavigationProps {
+  isMobileMenuOpen?: boolean
+  setIsMobileMenuOpen?: (open: boolean) => void
+}
+
+export function AdminNavigation({ isMobileMenuOpen, setIsMobileMenuOpen }: AdminNavigationProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -143,7 +150,7 @@ export function AdminNavigation() {
   }, [])
 
   const toggleGroup = (groupLabel: string) => {
-    if (collapsed) return // Don't toggle when collapsed
+    if (collapsed) return
     
     const newExpanded = new Set(expandedGroups)
     if (newExpanded.has(groupLabel)) {
@@ -162,62 +169,127 @@ export function AdminNavigation() {
     return pathname === item.href || pathname.startsWith(item.href + '/')
   }
 
-  // Render simple version during SSR to prevent hydration mismatch
-  if (!mounted) {
+  const handleMobileMenuClose = () => {
+    if (setIsMobileMenuOpen) {
+      setIsMobileMenuOpen(false)
+    }
+  }
+
+  // Mobile overlay
+  if (isMobileMenuOpen !== undefined) {
     return (
-      <nav className="bg-white shadow-sm border-r h-full min-h-screen w-64">
-        <div className="p-4 space-y-2">
-          <div className="pb-4 border-b flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-semibold text-gray-900 truncate">Church Admin</h2>
-              <p className="text-sm text-gray-600 truncate">Management Portal</p>
-            </div>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 flex-shrink-0">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="space-y-1">
-            {adminMenuGroups.map((group) => (
-              <div key={group.label} className="space-y-1">
-                <div className="flex items-center justify-between w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-700">
-                  <div className="flex items-center space-x-3">
-                    <group.icon className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate">{group.label}</span>
-                  </div>
-                  {group.items.length > 1 && (
-                    <ChevronDown className="h-3 w-3" />
-                  )}
+      <>
+        {/* Mobile Overlay */}
+        {isMobileMenuOpen && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            onClick={handleMobileMenuClose}
+          />
+        )}
+
+        {/* Mobile Navigation */}
+        <nav className={cn(
+          "fixed top-0 left-0 z-50 h-full bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:hidden w-80",
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        )}>
+          <div className="flex flex-col h-full">
+            {/* Mobile Header */}
+            <div className="flex-shrink-0 p-4 border-b">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <h2 className="text-lg font-semibold text-gray-900">Church Admin</h2>
+                  <p className="text-sm text-gray-600">Management Portal</p>
                 </div>
-                {group.defaultExpanded && (
-                  <div className="ml-4 space-y-1">
-                    {group.items.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition-colors w-full text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                      >
-                        <item.icon className="h-3 w-3 flex-shrink-0 opacity-60" />
-                        <span className="truncate">{item.label}</span>
-                      </Link>
-                    ))}
-                  </div>
-                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleMobileMenuClose}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
               </div>
-            ))}
+            </div>
+
+            {/* Mobile Menu Content */}
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-1">
+                {adminMenuGroups.map((group) => {
+                  const isActive = isGroupActive(group)
+                  const isExpanded = expandedGroups.has(group.label)
+                  
+                  return (
+                    <div key={group.label} className="space-y-1">
+                      {/* Group Header */}
+                      <button
+                        onClick={() => toggleGroup(group.label)}
+                        className={cn(
+                          'flex items-center justify-between w-full px-3 py-3 rounded-lg text-sm font-medium transition-colors',
+                          isActive 
+                            ? 'bg-purple-50 text-purple-700 border border-purple-200' 
+                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                        )}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <group.icon className="h-5 w-5 flex-shrink-0" />
+                          <span className="truncate">{group.label}</span>
+                        </div>
+                        {group.items.length > 1 && (
+                          <div className="flex-shrink-0">
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </div>
+                        )}
+                      </button>
+
+                      {/* Group Items */}
+                      {isExpanded && (
+                        <div className="ml-4 space-y-1">
+                          {group.items.map((item) => (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              onClick={handleMobileMenuClose}
+                              className={cn(
+                                'flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition-colors w-full',
+                                isItemActive(item)
+                                  ? 'bg-purple-100 text-purple-700 border-l-2 border-purple-500' 
+                                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                              )}
+                            >
+                              <item.icon className="h-4 w-4 flex-shrink-0 opacity-60" />
+                              <span className="truncate">{item.label}</span>
+                              {item.badge && (
+                                <span className="ml-auto bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">
+                                  {item.badge}
+                                </span>
+                              )}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
-        </div>
-      </nav>
+        </nav>
+      </>
     )
   }
 
+  // Desktop Navigation (existing code with lg:flex added)
   return (
     <TooltipProvider>
       <nav className={cn(
-        "bg-white shadow-sm border-r h-screen max-h-screen transition-all duration-300 ease-in-out flex flex-col",
+        "bg-white shadow-sm border-r h-screen max-h-screen transition-all duration-300 ease-in-out flex-col hidden lg:flex",
         collapsed ? "w-16" : "w-64"
       )}>
         <div className="flex-shrink-0 p-4 border-b">
-          {/* Header */}
           <div className={cn(
             "flex items-center transition-all duration-300",
             collapsed ? "justify-center" : "justify-between"
@@ -243,16 +315,13 @@ export function AdminNavigation() {
           </div>
         </div>
 
-        {/* Scrollable Menu Container */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
-          {/* Menu Groups */}
           <div className="space-y-1">
             {adminMenuGroups.map((group) => {
               const isActive = isGroupActive(group)
               const isExpanded = expandedGroups.has(group.label)
               
               if (collapsed) {
-                // Collapsed view - show only main icons with tooltips
                 return (
                   <div key={group.label} className="space-y-1">
                     <Tooltip delayDuration={0}>
@@ -292,7 +361,6 @@ export function AdminNavigation() {
 
               return (
                 <div key={group.label} className="space-y-1">
-                  {/* Group Header */}
                   <button
                     onClick={() => toggleGroup(group.label)}
                     className={cn(
@@ -317,7 +385,6 @@ export function AdminNavigation() {
                     )}
                   </button>
 
-                  {/* Group Items */}
                   {isExpanded && (
                     <div className="ml-4 space-y-1">
                       {group.items.map((item) => (
@@ -349,5 +416,30 @@ export function AdminNavigation() {
         </div>
       </nav>
     </TooltipProvider>
+  )
+}
+
+export function MobileAdminHeader({ onMenuClick }: { onMenuClick: () => void }) {
+  return (
+    <header className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30">
+      <div className="flex items-center space-x-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onMenuClick}
+          className="h-10 w-10 p-0"
+        >
+          <Menu className="h-6 w-6" />
+        </Button>
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900">Church Admin</h1>
+        </div>
+      </div>
+      
+      {/* Optional: Add user menu or other header actions */}
+      <div className="flex items-center space-x-2">
+        {/* You can add user avatar, notifications, etc. here */}
+      </div>
+    </header>
   )
 }

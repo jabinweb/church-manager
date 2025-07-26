@@ -17,16 +17,16 @@ interface Product {
   name: string
   description: string
   price: number
-  discount: number
-  images: string[]
+  discount?: number
+  images?: string[]
   stock: number
   sku: string
-  category: {
+  category?: {
     id: string
     name: string
-  }
-  stockQuantity?: number // Add for cart compatibility
-  imageUrl?: string | null // Add for cart compatibility
+  } | null
+  stockQuantity?: number
+  imageUrl?: string | null
 }
 
 export default function ProductDetailPage() {
@@ -50,7 +50,17 @@ export default function ProductDetailPage() {
       const response = await fetch(`/api/products/${id}`)
       if (!response.ok) throw new Error('Product not found')
       const data = await response.json()
-      setProduct(data)
+      
+      // Ensure we have a proper images array and convert price to number
+      const transformedProduct = {
+        ...data,
+        images: data.images || (data.imageUrl ? [data.imageUrl] : []),
+        discount: data.discount || 0,
+        stock: data.stockQuantity || data.stock || 0,
+        price: Number(data.price) || 0 // Ensure price is a number
+      }
+      
+      setProduct(transformedProduct)
     } catch (error) {
       console.error('Error fetching product:', error)
       toast.error('Failed to load product')
@@ -59,7 +69,7 @@ export default function ProductDetailPage() {
     }
   }
 
-  const getDiscountedPrice = (price: number, discount: number) => {
+  const getDiscountedPrice = (price: number, discount: number = 0) => {
     return price - (price * discount / 100)
   }
 
@@ -72,8 +82,8 @@ export default function ProductDetailPage() {
       const cartProduct = {
         id: product.id,
         name: product.name,
-        price: product.price,
-        imageUrl: product.images[0] || null,
+        price: Number(product.price) || 0, // Ensure price is a number
+        imageUrl: product.images?.[0] || product.imageUrl || null,
         stockQuantity: product.stock
       }
       const success = cartManager.addToCart(cartProduct, quantity)
@@ -98,8 +108,8 @@ export default function ProductDetailPage() {
       const cartProduct = {
         id: product.id,
         name: product.name,
-        price: product.price,
-        imageUrl: product.images[0] || null,
+        price: Number(product.price) || 0, // Ensure price is a number
+        imageUrl: product.images?.[0] || product.imageUrl || null,
         stockQuantity: product.stock
       }
       const success = cartManager.addToCart(cartProduct, quantity)
@@ -130,9 +140,9 @@ export default function ProductDetailPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Product not found</h1>
           <Button asChild>
-            <Link href="/products">
+            <Link href="/store">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Products
+              Back to Store
             </Link>
           </Button>
         </div>
@@ -140,16 +150,27 @@ export default function ProductDetailPage() {
     )
   }
 
+  // Get available images with fallback
+  const availableImages = product.images && product.images.length > 0 
+    ? product.images 
+    : product.imageUrl 
+    ? [product.imageUrl]
+    : ['https://images.pexels.com/photos/3683107/pexels-photo-3683107.jpeg'] // Default fallback
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Mobile-friendly Breadcrumb */}
         <nav className="flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm text-gray-500 mb-4 sm:mb-8 overflow-x-auto">
-          <Link href="/products" className="hover:text-gray-700 whitespace-nowrap">Products</Link>
-          <span>/</span>
-          <Link href={`/products?category=${product.category.id}`} className="hover:text-gray-700 whitespace-nowrap truncate max-w-20 sm:max-w-none">
-            {product.category.name}
-          </Link>
+          <Link href="/store" className="hover:text-gray-700 whitespace-nowrap">Store</Link>
+          {product.category && (
+            <>
+              <span>/</span>
+              <Link href={`/store?category=${product.category.id}`} className="hover:text-gray-700 whitespace-nowrap truncate max-w-20 sm:max-w-none">
+                {product.category.name}
+              </Link>
+            </>
+          )}
           <span>/</span>
           <span className="text-gray-900 truncate max-w-24 sm:max-w-none">{product.name}</span>
         </nav>
@@ -164,21 +185,21 @@ export default function ProductDetailPage() {
             <div className="space-y-2 sm:space-y-4">
               <div className="relative overflow-hidden rounded-lg bg-white">
                 <Image
-                  src={product.images[selectedImage] || 'https://images.pexels.com/photos/3683107/pexels-photo-3683107.jpeg'}
+                  src={availableImages[selectedImage]}
                   alt={product.name}
                   width={600}
                   height={600}
                   className="w-full h-64 sm:h-80 lg:h-96 object-cover"
                 />
-                {product.discount > 0 && (
+                {product.discount && product.discount > 0 && (
                   <Badge className="absolute top-2 sm:top-4 left-2 sm:left-4 bg-red-500 text-xs sm:text-sm">
                     {product.discount}% OFF
                   </Badge>
                 )}
               </div>
-              {product.images.length > 1 && (
+              {availableImages.length > 1 && (
                 <div className="flex space-x-1 sm:space-x-2 overflow-x-auto pb-2">
-                  {product.images.map((image, index) => (
+                  {availableImages.map((image, index) => (
                     <button
                       key={index}
                       onClick={() => setSelectedImage(index)}
@@ -210,7 +231,7 @@ export default function ProductDetailPage() {
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
                 <Badge variant="outline" className="self-start">
-                  {product.category.name}
+                  {product.category?.name || 'Uncategorized'}
                 </Badge>
                 <span className="text-xs sm:text-sm text-gray-500">SKU: {product.sku}</span>
               </div>
@@ -235,19 +256,19 @@ export default function ProductDetailPage() {
 
             <div className="space-y-3 sm:space-y-4">
               <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                {product.discount > 0 ? (
+                {product.discount && product.discount > 0 ? (
                   <>
                     <span className="text-2xl sm:text-3xl font-bold text-green-600">
-                      ₹{getDiscountedPrice(product.price, product.discount).toFixed(2)}
+                      ₹{getDiscountedPrice(Number(product.price) || 0, product.discount).toFixed(2)}
                     </span>
                     <span className="text-lg sm:text-xl text-gray-500 line-through">
-                      ₹{product.price.toFixed(2)}
+                      ₹{(Number(product.price) || 0).toFixed(2)}
                     </span>
                     <Badge className="bg-red-500 text-xs sm:text-sm">Save {product.discount}%</Badge>
                   </>
                 ) : (
                   <span className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    ₹{product.price.toFixed(2)}
+                    ₹{(Number(product.price) || 0).toFixed(2)}
                   </span>
                 )}
               </div>

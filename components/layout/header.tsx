@@ -114,7 +114,7 @@ export function Header() {
     {
       name: "Store",
       items: [
-        { name: 'Bookstore', href: '/bookstore', icon: ShoppingBag },
+        { name: 'Bookstore', href: '/store', icon: ShoppingBag },
       ]
     },
     {

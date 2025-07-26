@@ -11,12 +11,14 @@ import {
   LinkedInIcon,
   ArrowLeftIcon
 } from '@/components/layout/icons'
+import { MessageCircle, Link as LinkIcon } from 'lucide-react'
 import { 
   Tooltip, 
   TooltipContent, 
   TooltipTrigger 
 } from '@/components/ui/tooltip'
 import { toast } from 'sonner'
+import { LikeButton } from '@/components/comments/LikeButton'
 
 interface ContentActionsProps {
   url?: string
@@ -24,6 +26,13 @@ interface ContentActionsProps {
   backLink?: string
   onBack?: () => void
   vertical?: boolean
+  // Add content interaction props
+  contentType?: 'sermon' | 'blog'
+  contentId?: string
+  likes?: Array<{ id: string; type: string; userId: string }>
+  likeCount?: number
+  commentCount?: number
+  onCommentClick?: () => void
 }
 
 export default function ContentActions({
@@ -31,37 +40,53 @@ export default function ContentActions({
   title = 'Shared content',
   backLink,
   onBack,
-  vertical = true
+  vertical = true,
+  contentType,
+  contentId,
+  likes = [],
+  likeCount = 0,
+  commentCount = 0,
+  onCommentClick
 }: ContentActionsProps) {
   const [liked, setLiked] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)
   const [showShareMenu, setShowShareMenu] = useState(false)
+  const [copied, setCopied] = useState(false)
 
-  const handleShare = (platform: string) => {
-    let shareUrl = '';
-    
-    switch (platform) {
-      case 'facebook':
-        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
-        break;
-      case 'twitter':
-        shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`;
-        break;
-      case 'linkedin':
-        shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
-        break;
-      default:
-        // Copy to clipboard
-        navigator.clipboard.writeText(url);
-        toast.success('Link copied to clipboard!');
-        return;
+  const encodedUrl = encodeURIComponent(url)
+  const encodedTitle = encodeURIComponent(title)
+
+  const shareLinks = {
+    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+    twitter: `https://twitter.com/intent/tweet?text=${encodedTitle}&url=${encodedUrl}`,
+    linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`
+  }
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      toast.success('Link copied to clipboard!')
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      toast.error('Failed to copy link')
     }
-    
-    if (shareUrl) {
-      window.open(shareUrl, '_blank', 'noopener,noreferrer');
+  }
+
+  const openShareWindow = (url: string) => {
+    window.open(url, '_blank', 'width=600,height=400')
+  }
+
+  const handleCommentClick = () => {
+    if (onCommentClick) {
+      onCommentClick()
+    } else {
+      // Default behavior: scroll to comments section
+      const commentsSection = document.querySelector('.comments-section, [data-comments]')
+      if (commentsSection) {
+        commentsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
     }
-    
-    setShowShareMenu(false);
   }
 
   if (!vertical) {
@@ -73,14 +98,14 @@ export default function ContentActions({
           </Button>
         )}
         <div className="flex gap-2">
-          <Button 
+          {/* <Button 
             variant="ghost" 
             size="icon" 
             className={`h-8 w-8 rounded-full ${liked ? 'text-red-500' : 'text-gray-400'}`}
             onClick={() => setLiked(!liked)}
           >
             <HeartIcon size={16} className={liked ? 'fill-current' : ''} />
-          </Button>
+          </Button> */}
           <Button 
             variant="ghost" 
             size="icon" 
@@ -137,7 +162,7 @@ export default function ContentActions({
                   variant="ghost" 
                   size="icon" 
                   className="h-8 w-8 rounded-full text-blue-600"
-                  onClick={() => handleShare('facebook')}
+                  onClick={() => openShareWindow(shareLinks.facebook)}
                 >
                   <FacebookIcon size={16} />
                 </Button>
@@ -153,7 +178,7 @@ export default function ContentActions({
                   variant="ghost" 
                   size="icon" 
                   className="h-8 w-8 rounded-full text-blue-400"
-                  onClick={() => handleShare('twitter')}
+                  onClick={() => openShareWindow(shareLinks.twitter)}
                 >
                   <TwitterIcon size={16} />
                 </Button>
@@ -169,13 +194,29 @@ export default function ContentActions({
                   variant="ghost" 
                   size="icon" 
                   className="h-8 w-8 rounded-full text-blue-700"
-                  onClick={() => handleShare('linkedin')}
+                  onClick={() => openShareWindow(shareLinks.linkedin)}
                 >
                   <LinkedInIcon size={16} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">
                 <p>Share on LinkedIn</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`h-8 w-8 rounded-full ${copied ? 'text-green-600 bg-green-50' : 'text-gray-600 hover:bg-gray-50'}`}
+                  onClick={copyToClipboard}
+                >
+                  <LinkIcon className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>{copied ? 'Copied!' : 'Copy link'}</p>
               </TooltipContent>
             </Tooltip>
           </div>
@@ -195,6 +236,46 @@ export default function ContentActions({
           {bookmarked ? 'Saved' : 'Save'}
         </span>
       </div>
+
+      {/* Content Interaction Buttons */}
+      {contentType && contentId && (
+        <div className="flex flex-col items-center space-y-3 pb-4 border-b border-gray-200 w-full">
+          {/* Like Button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex flex-col items-center">
+                <LikeButton
+                  contentType={contentType}
+                  contentId={contentId}
+                  likes={likes}
+                  likeCount={likeCount}
+                />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>Like this {contentType}</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Comment Button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCommentClick}
+                className="flex flex-col items-center p-2 h-auto text-gray-600 hover:text-purple-600 hover:bg-purple-50"
+              >
+                <MessageCircle className="h-5 w-5 mb-1" />
+                <span className="text-xs">{commentCount}</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>View comments ({commentCount})</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      )}
     </div>
   )
 }

@@ -10,13 +10,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { toast } from 'sonner'
-import { CommentIcon, ArrowLeftIcon } from '@/components/layout/icons'
+import { ArrowLeftIcon, MessageCircle } from 'lucide-react'
 
 // Import shared components
 import HeroHeader from '@/components/content/HeroHeader'
 import ContentActions from '@/components/content/ContentActions'
 import AuthorBio from '@/components/content/AuthorBio'
 import RelatedContent from '@/components/content/RelatedContent'
+import { CommentSection } from '@/components/comments/CommentSection'
+import { LikeButton } from '@/components/comments/LikeButton'
 
 interface BlogPost {
   id: string
@@ -41,6 +43,8 @@ interface BlogPost {
   category?: {
     name: string
   } | null
+  commentCount?: number
+  likeCount?: number
 }
 
 function estimateReadingTime(content: string): number {
@@ -165,6 +169,13 @@ export default function BlogPostPage() {
     setEmailSubscription('');
   };
 
+  const handleCommentClick = () => {
+    const commentsSection = document.querySelector('[data-comments]')
+    if (commentsSection) {
+      commentsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -183,7 +194,7 @@ export default function BlogPostPage() {
           <CardContent className="pt-6 px-6">
             <div className="text-center">
               <div className="bg-gray-100 p-6 rounded-full inline-flex mb-4">
-                <CommentIcon size={32} className="text-gray-400" />
+                <MessageCircle size={32} className="text-gray-400" />
               </div>
               <h1 className="text-2xl font-bold mb-2">Blog Post Not Found</h1>
               <p className="text-gray-500 mb-6">The blog post you&apos;re looking for does not exist or has been removed.</p>
@@ -243,6 +254,12 @@ export default function BlogPostPage() {
                 <ContentActions 
                   title={blogPost.title}
                   vertical={true}
+                  contentType="blog"
+                  contentId={blogPost.id}
+                  likes={[]} // Fetch actual likes from API
+                  likeCount={blogPost.likeCount || 0}
+                  commentCount={blogPost.commentCount || 0}
+                  onCommentClick={handleCommentClick}
                 />
               </div>
               
@@ -254,7 +271,12 @@ export default function BlogPostPage() {
                     <ContentActions 
                       title={blogPost.title}
                       vertical={false}
-                      backLink="/blog"
+                      contentType="blog"
+                      contentId={blogPost.id}
+                      likes={[]} // Fetch actual likes from API
+                      likeCount={blogPost.likeCount || 0}
+                      commentCount={blogPost.commentCount || 0}
+                      onCommentClick={handleCommentClick}
                       onBack={() => router.push('/blog')}
                     />
                     
@@ -280,6 +302,20 @@ export default function BlogPostPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Blog engagement */}
+                    <div className="mt-8 pt-6 border-t flex items-center gap-6">
+                      <LikeButton
+                        contentType="blog"
+                        contentId={blogPost.id}
+                        likes={[]} // Initialize with empty array instead of undefined
+                        likeCount={blogPost.likeCount || 0}
+                      />
+                      <div className="flex items-center gap-1 text-gray-500">
+                        <MessageCircle className="h-4 w-4" />
+                        <span className="text-sm">{blogPost.commentCount || 0} comments</span>
+                      </div>
+                    </div>
                     
                     {/* Author Bio Component */}
                     <AuthorBio
@@ -291,6 +327,15 @@ export default function BlogPostPage() {
                     />
                   </CardContent>
                 </Card>
+                
+                {/* Comments Section */}
+                <div className="mt-8" data-comments>
+                  <CommentSection
+                    contentType="blog"
+                    contentId={blogPost.id}
+                    initialCommentCount={blogPost.commentCount || 0}
+                  />
+                </div>
                 
                 {/* Related Posts Component */}
                 <RelatedContent 
@@ -388,4 +433,3 @@ export default function BlogPostPage() {
     </TooltipProvider>
   )
 }
-                 

@@ -25,6 +25,10 @@ import ContentActions from '@/components/content/ContentActions'
 import AuthorBio from '@/components/content/AuthorBio'
 import RelatedContent from '@/components/content/RelatedContent'
 import SermonThumbnail from '@/components/sermon/SermonThumbnail'
+import { VideoPlayer } from '@/components/sermon/VideoPlayer'
+import { AudioPlayer } from '@/components/sermon/AudioPlayer'
+import { CommentSection } from '@/components/comments/CommentSection'
+import { LikeButton } from '@/components/comments/LikeButton'
 
 interface Sermon {
   id: string
@@ -47,6 +51,8 @@ interface Sermon {
     name: string | null
     image: string | null
   }
+  commentCount?: number
+  likeCount?: number
 }
 
 export default function SingleSermonPage() {
@@ -142,6 +148,13 @@ export default function SingleSermonPage() {
     )
   }
 
+  const handleCommentClick = () => {
+    const commentsSection = document.querySelector('[data-comments]')
+    if (commentsSection) {
+      commentsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-gray-50 py-10">
@@ -154,25 +167,33 @@ export default function SingleSermonPage() {
                 <ContentActions 
                   title={sermon.title}
                   vertical={true}
+                  contentType="sermon"
+                  contentId={sermon.id}
+                  likes={[]} // Fetch actual likes from API
+                  likeCount={sermon.likeCount || 0}
+                  commentCount={sermon.commentCount || 0}
+                  onCommentClick={handleCommentClick}
                 />
               </div>
               
               {/* Main Content */}
               <div className="lg:flex-1 max-w-4xl">
+                {/* Mobile sharing */}
+                <ContentActions 
+                  title={sermon.title}
+                  vertical={false}
+                  contentType="sermon"
+                  contentId={sermon.id}
+                  likes={[]} // Fetch actual likes from API
+                  likeCount={sermon.likeCount || 0}
+                  commentCount={sermon.commentCount || 0}
+                  onCommentClick={handleCommentClick}
+                  onBack={() => router.push('/sermons')}
+                />
+
                 <div className="overflow-hidden">
                  
                   <div className="">
-                    {/* Mobile sharing */}
-                    <div className="flex justify-between items-center mb-5 lg:hidden">
-                      <Badge variant="outline" className="text-purple-600 border-purple-200 bg-purple-50">
-                        {sermon.series || 'Sermon'}
-                      </Badge>
-                      <Button variant="outline" size="sm" className="h-8 gap-2">
-                        <Share2 size={14} />
-                        Share
-                      </Button>
-                    </div>
-                    
                     {/* Media Toggle */}
                     {(sermon.videoUrl && sermon.audioUrl) && (
                       <div className="flex gap-2 mb-4">
@@ -193,10 +214,39 @@ export default function SingleSermonPage() {
                       </div>
                     )}
                     
-                    {/* Media Player */}
-                    <div className="mb-6 bg-gray-50 rounded-lg overflow-hidden">
-                      {/* Sermon thumbnail when no player is active */}
-                      {!((sermon.videoUrl && playerType === 'video') || (sermon.audioUrl && playerType === 'audio')) && (
+                    {/* Custom Media Players */}
+                    <div className="mb-6">
+                      {sermon.videoUrl && sermon.audioUrl ? (
+                        playerType === 'video' ? (
+                          <VideoPlayer
+                            src={sermon.videoUrl}
+                            title={sermon.title}
+                            className="w-full"
+                          />
+                        ) : (
+                          <AudioPlayer
+                            src={sermon.audioUrl}
+                            title={sermon.title}
+                            speaker={sermon.speaker}
+                            duration={sermon.duration || undefined}
+                            className="w-full"
+                          />
+                        )
+                      ) : sermon.videoUrl ? (
+                        <VideoPlayer
+                          src={sermon.videoUrl}
+                          title={sermon.title}
+                          className="w-full"
+                        />
+                      ) : sermon.audioUrl ? (
+                        <AudioPlayer
+                          src={sermon.audioUrl}
+                          title={sermon.title}
+                          speaker={sermon.speaker}
+                          duration={sermon.duration || undefined}
+                          className="w-full"
+                        />
+                      ) : (
                         <SermonThumbnail
                           title={sermon.title}
                           videoUrl={sermon.videoUrl}
@@ -207,45 +257,6 @@ export default function SingleSermonPage() {
                           height={400}
                         />
                       )}
-                      
-                      {/* Players */}
-                      {sermon.videoUrl && sermon.audioUrl ? (
-                        playerType === 'video' ? (
-                          <div className="w-full aspect-video bg-black rounded-lg overflow-hidden">
-                            <iframe
-                              src={sermon.videoUrl}
-                              title={sermon.title}
-                              allow="autoplay; encrypted-media"
-                              allowFullScreen
-                              className="w-full h-full"
-                            />
-                          </div>
-                        ) : (
-                          <div className="p-6 bg-gradient-to-br from-purple-50 to-gray-50">
-                            <audio controls autoPlay className="w-full">
-                              <source src={sermon.audioUrl} />
-                              Your browser does not support the audio element.
-                            </audio>
-                          </div>
-                        )
-                      ) : sermon.videoUrl ? (
-                        <div className="w-full aspect-video bg-black rounded-lg overflow-hidden">
-                          <iframe
-                            src={sermon.videoUrl}
-                            title={sermon.title}
-                            allow="autoplay; encrypted-media"
-                            allowFullScreen
-                            className="w-full h-full"
-                          />
-                        </div>
-                      ) : sermon.audioUrl ? (
-                        <div className="p-6 bg-gradient-to-br from-purple-50 to-gray-50">
-                          <audio controls autoPlay className="w-full">
-                            <source src={sermon.audioUrl} />
-                            Your browser does not support the audio element.
-                          </audio>
-                        </div>
-                      ) : null}
                     </div>
 
                    {/* Sermon Title Header */}
@@ -339,6 +350,20 @@ export default function SingleSermonPage() {
                   </div>
                 </div>
                 
+                {/* Sermon engagement */}
+                <div className="mb-8 flex items-center gap-6">
+                  <LikeButton
+                    contentType="sermon"
+                    contentId={sermon.id}
+                    likes={[]} // Initialize with empty array instead of undefined
+                    likeCount={sermon.likeCount || 0}
+                  />
+                  <div className="flex items-center gap-1 text-gray-500">
+                    <MessageSquareIcon className="h-4 w-4" />
+                    <span className="text-sm">{sermon.commentCount || 0} comments</span>
+                  </div>
+                </div>
+
                 {/* Speaker Bio */}
                 <div className="mt-8 bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-8">
                   <AuthorBio
@@ -350,15 +375,14 @@ export default function SingleSermonPage() {
                   />
                 </div>
                 
-                {/* Related sermons */}
-                {/* <div className="mt-10">
-                  <RelatedContent
-                    items={filteredRelatedSermons}
-                    basePath="/sermons"
-                    title="More Sermons"
-                    emptyMessage="No related sermons found"
+                {/* Comments Section */}
+                <div className="mt-10" data-comments>
+                  <CommentSection
+                    contentType="sermon"
+                    contentId={sermon.id}
+                    initialCommentCount={sermon.commentCount || 0}
                   />
-                </div> */}
+                </div>
               </div>
               
               {/* Right Sidebar */}
@@ -424,4 +448,3 @@ export default function SingleSermonPage() {
     </TooltipProvider>
   )
 }
-

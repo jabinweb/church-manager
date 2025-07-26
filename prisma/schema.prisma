@@ -93,6 +93,8 @@ model User {
   linkedFamilyMembers      FamilyMember[]            @relation("LinkedFamilyMembers")
   createdConversations     Conversation[]            @relation("CreatedConversations")
   messageReactions         MessageReaction[]         @relation("MessageReactions")
+  comments                 Comment[]                 @relation("CommentAuthor")
+  likes                    Like[]                    @relation("UserLikes")
 
   @@map("users")
 }
@@ -181,6 +183,11 @@ model Sermon {
   authorId String?
   author   User?   @relation(fields: [authorId], references: [id])
 
+  comments     Comment[]
+  likes        Like[]
+  commentCount Int       @default(0)
+  likeCount    Int       @default(0)
+
   @@map("sermons")
 }
 
@@ -266,6 +273,11 @@ model BlogPost {
 
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
+
+  comments     Comment[]
+  likes        Like[]
+  commentCount Int       @default(0)
+  likeCount    Int       @default(0)
 
   @@map("blog_posts")
 }
@@ -765,4 +777,69 @@ model FamilyMember {
   linkedUser User? @relation("LinkedFamilyMembers", fields: [linkedUserId], references: [id], onDelete: SetNull)
 
   @@map("family_members")
+}
+
+// Comments System
+model Comment {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  authorId  String
+  parentId  String? // For nested replies
+  
+  // Polymorphic relations - content can be sermon, blog, etc.
+  sermonId  String?
+  blogPostId String?
+  
+  isApproved Boolean  @default(false) // For moderation
+  isEdited   Boolean  @default(false)
+  editedAt   DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author   User      @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies  Comment[] @relation("CommentReplies")
+  
+  sermon   Sermon?   @relation(fields: [sermonId], references: [id], onDelete: Cascade)
+  blogPost BlogPost? @relation(fields: [blogPostId], references: [id], onDelete: Cascade)
+  
+  likes    Like[]
+
+  @@index([sermonId])
+  @@index([blogPostId])
+  @@index([createdAt])
+  @@map("comments")
+}
+
+// Likes System
+enum LikeType {
+  LIKE
+  LOVE
+  PRAY
+  AMEN
+}
+
+model Like {
+  id     String   @id @default(cuid())
+  type   LikeType @default(LIKE)
+  userId String
+  
+  // Polymorphic relations
+  sermonId   String?
+  blogPostId String?
+  commentId  String?
+  
+  createdAt DateTime @default(now())
+
+  user     User      @relation("UserLikes", fields: [userId], references: [id], onDelete: Cascade)
+  sermon   Sermon?   @relation(fields: [sermonId], references: [id], onDelete: Cascade)
+  blogPost BlogPost? @relation(fields: [blogPostId], references: [id], onDelete: Cascade)
+  comment  Comment?  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  // Ensure one like per user per content
+  @@unique([userId, sermonId])
+  @@unique([userId, blogPostId])
+  @@unique([userId, commentId])
+  @@map("likes")
 }

@@ -464,26 +464,27 @@ export default function FileManagementPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 lg:py-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="mb-6 lg:mb-8"
         >
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-600 to-blue-600 bg-clip-text text-transparent">
+              <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-slate-600 to-blue-600 bg-clip-text text-transparent">
                 File Management
               </h1>
-              <p className="text-gray-600 mt-2">Manage your organization&apos;s files and media assets</p>
+              <p className="text-gray-600 mt-2 text-sm lg:text-base">Manage your organization&apos;s files and media assets</p>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
               <Button 
                 variant="outline" 
                 onClick={performSync} 
                 disabled={syncing}
-                className="bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+                className="bg-green-50 hover:bg-green-100 border-green-200 text-green-700 text-sm"
+                size="sm"
               >
                 {syncing ? (
                   <>
@@ -499,16 +500,17 @@ export default function FileManagementPage() {
               </Button>
               
               {lastSync && (
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-gray-500 hidden sm:inline">
                   Last sync: {format(new Date(lastSync), 'HH:mm:ss')}
                 </span>
               )}
 
               <Dialog open={createFolderOpen} onOpenChange={setCreateFolderOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="outline" size="sm">
                     <FolderPlus className="h-4 w-4 mr-2" />
-                    New Folder
+                    <span className="hidden sm:inline">New Folder</span>
+                    <span className="sm:hidden">Folder</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
@@ -542,9 +544,10 @@ export default function FileManagementPage() {
 
               <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+                  <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700" size="sm">
                     <Upload className="h-4 w-4 mr-2" />
-                    Upload Files
+                    <span className="hidden sm:inline">Upload Files</span>
+                    <span className="sm:hidden">Upload</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl">
@@ -590,67 +593,67 @@ export default function FileManagementPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+            className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-6 lg:mb-8"
           >
             <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-400 to-indigo-500 text-white">
-              <CardContent className="p-6">
+              <CardContent className="p-3 lg:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-blue-100 text-sm font-medium">Total Files</p>
-                    <p className="text-3xl font-bold">{stats.totalFiles}</p>
+                    <p className="text-blue-100 text-xs lg:text-sm font-medium">Total Files</p>
+                    <p className="text-xl lg:text-3xl font-bold">{stats.totalFiles}</p>
                     {stats.blobCount !== undefined && (
-                      <p className="text-blue-200 text-xs">
+                      <p className="text-blue-200 text-xs hidden lg:block">
                         Blob: {typeof stats.blobCount === 'number' ? stats.blobCount : 'Unavailable'}
                       </p>
                     )}
                   </div>
-                  <File className="h-8 w-8 text-blue-200" />
+                  <File className="h-6 w-6 lg:h-8 lg:w-8 text-blue-200" />
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg bg-gradient-to-br from-green-400 to-emerald-500 text-white">
-              <CardContent className="p-6">
+              <CardContent className="p-3 lg:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-green-100 text-sm font-medium">Storage Used</p>
-                    <p className="text-3xl font-bold">{formatFileSize(stats.totalSize)}</p>
+                    <p className="text-green-100 text-xs lg:text-sm font-medium">Storage Used</p>
+                    <p className="text-xl lg:text-3xl font-bold">{formatFileSize(stats.totalSize)}</p>
                     {stats.blobSize !== undefined && (
                       <p className="text-green-200 text-xs">
                         Blob: {formatFileSize(stats.blobSize)} {stats.syncStatus?.error && '(Unavailable)'}
                       </p>
                     )}
                   </div>
-                  <HardDrive className="h-8 w-8 text-green-200" />
+                  <HardDrive className="h-6 w-6 lg:h-8 lg:w-8 text-green-200" />
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-400 to-pink-500 text-white">
-              <CardContent className="p-6">
+              <CardContent className="p-3 lg:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-purple-100 text-sm font-medium">Folders</p>
-                    <p className="text-3xl font-bold">{stats.totalFolders}</p>
+                    <p className="text-purple-100 text-xs lg:text-sm font-medium">Folders</p>
+                    <p className="text-xl lg:text-3xl font-bold">{stats.totalFolders}</p>
                     {stats.syncStatus && (
                       <p className={`text-xs ${stats.syncStatus.error ? 'text-red-200' : stats.syncStatus.inSync ? 'text-purple-200' : 'text-yellow-200'}`}>
                         {stats.syncStatus.error ? 'Sync Error' : stats.syncStatus.inSync ? 'In Sync' : 'Sync Needed'}
                       </p>
                     )}
                   </div>
-                  <Folder className="h-8 w-8 text-purple-200" />
+                  <Folder className="h-6 w-6 lg:h-8 lg:w-8 text-purple-200" />
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-400 to-red-500 text-white">
-              <CardContent className="p-6">
+              <CardContent className="p-3 lg:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-orange-100 text-sm font-medium">Recent Uploads</p>
-                    <p className="text-3xl font-bold">{stats.recentUploads}</p>
+                    <p className="text-orange-100 text-xs lg:text-sm font-medium">Recent Uploads</p>
+                    <p className="text-xl lg:text-3xl font-bold">{stats.recentUploads}</p>
                   </div>
-                  <Upload className="h-8 w-8 text-orange-200" />
+                  <Upload className="h-6 w-6 lg:h-8 lg:w-8 text-orange-200" />
                 </div>
               </CardContent>
             </Card>
@@ -665,11 +668,11 @@ export default function FileManagementPage() {
           className="mb-6"
         >
           <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-6">
-              {/* Breadcrumb */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-2 text-sm">
-                  <Button variant="ghost" size="sm" onClick={() => setCurrentPath('/')}>
+            <CardContent className="p-3 lg:p-6">
+              {/* Breadcrumb - Mobile responsive */}
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-4 space-y-2 lg:space-y-0">
+                <div className="flex items-center space-x-1 lg:space-x-2 text-sm overflow-x-auto">
+                  <Button variant="ghost" size="sm" onClick={() => setCurrentPath('/')} className="text-xs lg:text-sm">
                     Home
                   </Button>
                   {currentPath.split('/').filter(p => p).map((part, index, array) => (
@@ -701,6 +704,7 @@ export default function FileManagementPage() {
                     variant={viewMode === 'grid' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setViewMode('grid')}
+                    className="h-8 w-8 p-0"
                   >
                     <Grid className="h-4 w-4" />
                   </Button>
@@ -708,21 +712,22 @@ export default function FileManagementPage() {
                     variant={viewMode === 'list' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setViewMode('list')}
+                    className="h-8 w-8 p-0"
                   >
                     <List className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
 
-              {/* Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Filters - Mobile responsive */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     placeholder="Search files..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 text-sm"
                   />
                 </div>
                 
@@ -760,7 +765,7 @@ export default function FileManagementPage() {
           </Card>
         </motion.div>
 
-        {/* File Grid/List */}
+        {/* File Grid/List - Update for mobile responsiveness */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -785,7 +790,7 @@ export default function FileManagementPage() {
               </CardContent>
             </Card>
           ) : viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-6">
               {filteredFiles.map((file, index) => (
                 <motion.div
                   key={file.id}
@@ -889,7 +894,7 @@ export default function FileManagementPage() {
             <Card className="border-0 shadow-lg">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full min-w-[600px]">
                     <thead className="bg-gray-50 border-b">
                       <tr>
                         <th className="text-left py-3 px-6 font-medium text-gray-700">

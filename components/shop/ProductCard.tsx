@@ -34,6 +34,7 @@ export default function ProductCard({ product, index }: { product: any, index: n
   const router = useRouter()
   const { currencySymbol, currency } = useSystemSettings()
   const [showPrice, setShowPrice] = useState(false)
+  const [imageError, setImageError] = useState(false)
 
   useEffect(() => {
     // Only show price when currencySymbol is loaded and not the default '$' (unless USD)
@@ -123,11 +124,27 @@ export default function ProductCard({ product, index }: { product: any, index: n
         onClick={handleCardClick}
       >
         <div className="relative overflow-hidden">
-          <div className="w-full h-48 bg-gradient-to-br from-purple-400 to-blue-500 flex items-center justify-center">
-            <CategoryIcon className="h-16 w-16 text-white/70" />
+          {/* 16:9 aspect ratio container */}
+          <div className="w-full aspect-video bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center relative">
+            {product.imageUrl && !imageError ? (
+              <Image
+                src={product.imageUrl}
+                alt={product.name}
+                fill
+                className="object-cover"
+                onError={() => setImageError(true)}
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                priority={index < 3}
+              />
+            ) : (
+              <CategoryIcon className="h-16 w-16 text-purple-400/60" />
+            )}
+            
+            {/* Gradient overlay for better text readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
           </div>
           
-          <div className="absolute top-2 right-2 flex items-center bg-white rounded-full px-2 py-1 shadow-sm">
+          <div className="absolute top-2 right-2 flex items-center bg-white/90 backdrop-blur-sm rounded-full px-2 py-1 shadow-sm">
             <Star className="h-3 w-3 text-yellow-400 fill-current" />
             <span className="text-xs ml-1 font-medium">4.5</span>
           </div>
@@ -138,7 +155,7 @@ export default function ProductCard({ product, index }: { product: any, index: n
             </div>
           )}
           
-          <Badge variant="outline" className="absolute bottom-2 right-2 text-xs">
+          <Badge variant="outline" className="absolute bottom-2 right-2 text-xs bg-white/90 backdrop-blur-sm">
             <CategoryIcon className="h-3 w-3 mr-1" />
             {getCategoryName(product.category)}
           </Badge>
