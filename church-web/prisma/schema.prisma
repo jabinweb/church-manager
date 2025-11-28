@@ -1,0 +1,846 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// System Settings
+model SystemSettings {
+  id                      String   @id @default(cuid())
+  churchName              String   @default("Grace Community Church")
+  churchAddress           String?
+  churchPhone             String?
+  churchEmail             String?
+  churchWebsite           String?
+  enableOnlineGiving      Boolean  @default(true)
+  enableEventRegistration Boolean  @default(true)
+  enablePrayerRequests    Boolean  @default(true)
+  maintenanceMode         Boolean  @default(false)
+  currency                String   @default("USD")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  logoUrl                 String?
+  primaryColor            String? // e.g. "#7c3aed"
+  secondaryColor          String? // e.g. "#6366f1"
+  accentColor             String? // e.g. "#f59e42"
+  backgroundColor         String? // e.g. "#f9fafb"
+  textColor               String? // e.g. "#111827"
+  timezone                String?
+  defaultLanguage         String?
+  announcement            String?
+  facebookUrl             String?
+  twitterUrl              String?
+  instagramUrl            String?
+  supportPhone            String?
+  privacyPolicyUrl        String?
+  termsUrl                String?
+
+  @@map("system_settings")
+}
+
+// User Management
+enum UserRole {
+  ADMIN
+  PASTOR
+  STAFF
+  MEMBER
+  CUSTOMER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String? // Add password field for credentials login
+  role          UserRole  @default(MEMBER)
+  phone         String?
+  address       String?
+  dateOfBirth   DateTime?
+  anniversary   DateTime? // Add anniversary field for users
+  joinDate      DateTime  @default(now())
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now())
+
+  // Relations
+  accounts                 Account[]
+  sessions                 Session[]
+  memberProfile            MemberProfile?
+  donations                Donation[]
+  eventRegistrations       EventRegistration[]
+  prayerRequests           PrayerRequest[]
+  blogPosts                BlogPost[]
+  orders                   Order[]
+  sermons                  Sermon[]
+  products                 Product[]
+  attendance               Attendance[]
+  ledSmallGroups           SmallGroup[]
+  smallGroupMembers        SmallGroupMember[]
+  volunteers               Volunteer[]
+  careReceived             PastoralCare[]            @relation("CareRecipient")
+  careProvided             PastoralCare[]            @relation("CareProvider")
+  addresses                Address[]
+  uploadedFiles            File[]                    @relation("UploadedFiles")
+  groupJoinRequests        GroupJoinRequest[]
+  conversationParticipants ConversationParticipant[]
+  sentMessages             Message[]                 @relation("SentMessages")
+  familyMembers            FamilyMember[]
+  linkedFamilyMembers      FamilyMember[]            @relation("LinkedFamilyMembers")
+  createdConversations     Conversation[]            @relation("CreatedConversations")
+  messageReactions         MessageReaction[]         @relation("MessageReactions")
+  comments                 Comment[]                 @relation("CommentAuthor")
+  likes                    Like[]                    @relation("UserLikes")
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// Member Profile
+model MemberProfile {
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  emergencyContact    String?
+  emergencyPhone      String?
+  baptismDate         DateTime?
+  membershipDate      DateTime?
+  skills              String[]
+  interests           String[]
+  ministryInvolvement String[]
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("member_profiles")
+}
+
+// Sermons
+model Sermon {
+  id                 String   @id @default(cuid())
+  title              String
+  slug               String   @unique @default("")
+  description        String?
+  speaker            String
+  series             String?
+  date               DateTime
+  duration           String?
+  audioUrl           String?
+  videoUrl           String?
+  scriptureReference String?
+  tags               String[]
+  isPublished        Boolean  @default(false)
+  views              Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now())
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  authorId String?
+  author   User?   @relation(fields: [authorId], references: [id])
+
+  comments     Comment[]
+  likes        Like[]
+  commentCount Int       @default(0)
+  likeCount    Int       @default(0)
+
+  @@map("sermons")
+}
+
+// Events
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  COMPLETED
+}
+
+model Event {
+  id                   String      @id @default(cuid())
+  title                String
+  description          String?
+  startDate            DateTime
+  endDate              DateTime?
+  location             String?
+  capacity             Int?
+  registrationFee      Decimal?    @db.Decimal(10, 2)
+  requiresRegistration Boolean     @default(false)
+  isPublished          Boolean     @default(false)
+  status               EventStatus @default(DRAFT)
+  category             String?
+  imageUrl             String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @default(now())
+
+  registrations EventRegistration[]
+
+  @@map("events")
+}
+
+model EventRegistration {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  attendees Int      @default(1)
+  notes     String?
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_registrations")
+}
+
+// News & Announcements
+model NewsPost {
+  id          String    @id @default(cuid())
+  title       String
+  content     String    @db.Text
+  excerpt     String?
+  authorId    String
+  isPublished Boolean   @default(false)
+  publishDate DateTime?
+  imageUrl    String?
+  tags        String[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now())
+
+  @@map("news_posts")
+}
+
+// Blog
+model BlogPost {
+  id          String    @id @default(cuid())
+  title       String
+  content     String    @db.Text
+  excerpt     String?
+  slug        String    @unique
+  authorId    String
+  isPublished Boolean   @default(false)
+  publishDate DateTime?
+  imageUrl    String?
+  tags        String[]
+  views       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now())
+
+  author User @relation(fields: [authorId], references: [id])
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+
+  comments     Comment[]
+  likes        Like[]
+  commentCount Int       @default(0)
+  likeCount    Int       @default(0)
+
+  @@map("blog_posts")
+}
+
+// Prayer Requests
+enum PrayerRequestStatus {
+  PENDING
+  APPROVED
+  ANSWERED
+  ARCHIVED
+}
+
+model PrayerRequest {
+  id          String              @id @default(cuid())
+  userId      String?
+  name        String
+  email       String?
+  request     String              @db.Text
+  isAnonymous Boolean             @default(false)
+  isUrgent    Boolean             @default(false)
+  status      PrayerRequestStatus @default(PENDING)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("prayer_requests")
+}
+
+// Giving & Donations
+enum DonationStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  BANK_TRANSFER
+  CHECK
+  CASH
+}
+
+model Fund {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  targetAmount Decimal? @db.Decimal(10, 2)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now())
+
+  donations Donation[]
+
+  @@map("funds")
+}
+
+model Donation {
+  id                 String         @id @default(cuid())
+  userId             String?
+  fundId             String
+  amount             Decimal        @db.Decimal(10, 2)
+  paymentMethod      PaymentMethod
+  transactionId      String?
+  isRecurring        Boolean        @default(false)
+  recurringFrequency String?
+  status             DonationStatus @default(PENDING)
+  donorName          String?
+  donorEmail         String?
+  notes              String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+  fund Fund  @relation(fields: [fundId], references: [id])
+
+  @@map("donations")
+}
+
+// E-commerce (Books & Shop)
+model ProductCategory {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  imageUrl    String?
+  isActive    Boolean   @default(true)
+  products    Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  @@map("product_categories")
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?  @db.Text
+  price         Decimal  @db.Decimal(10, 2)
+  sku           String?  @unique // Make nullable first for migration
+  slug          String?  @unique // Make nullable first for migration
+  categoryId    String?
+  imageUrl      String?
+  stockQuantity Int      @default(0)
+  isActive      Boolean  @default(true)
+  tags          String[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
+
+  category   ProductCategory? @relation(fields: [categoryId], references: [id])
+  orderItems OrderItem[]
+
+  authorId String?
+  author   User?   @relation(fields: [authorId], references: [id])
+
+  @@map("products")
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  userId          String?
+  addressId       String?
+  customerName    String
+  customerEmail   String
+  customerPhone   String?
+  shippingAddress String?
+  totalAmount     Decimal     @db.Decimal(10, 2)
+  status          OrderStatus @default(PENDING)
+  notes           String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @default(now())
+
+  user       User?       @relation(fields: [userId], references: [id])
+  address    Address?    @relation(fields: [addressId], references: [id])
+  orderItems OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+// Ministries
+model Ministry {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String?  @unique
+  description String?  @db.Text
+  leader      String?
+  meetingTime String?
+  location    String?
+  isActive    Boolean  @default(true)
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  volunteers Volunteer[]
+
+  @@map("ministries")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  sermons   Sermon[]
+  blogPosts BlogPost[]
+  // newsPosts   NewsPost[]
+  // events      Event[]
+
+  @@map("categories")
+}
+
+// Add these models to complete the church management system
+
+model Attendance {
+  id        String    @id @default(cuid())
+  userId    String
+  eventId   String?
+  serviceId String?
+  checkIn   DateTime
+  checkOut  DateTime?
+  method    String // QR_CODE, MANUAL, KIOSK
+  notes     String?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model SmallGroup {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  leaderId    String
+  meetingDay  String
+  meetingTime String
+  location    String?
+  capacity    Int?
+  isActive    Boolean @default(true)
+
+  leader       User               @relation(fields: [leaderId], references: [id])
+  members      SmallGroupMember[]
+  joinRequests GroupJoinRequest[]
+}
+
+model SmallGroupMember {
+  id           String   @id @default(cuid())
+  userId       String
+  smallGroupId String
+  joinedAt     DateTime @default(now())
+  isActive     Boolean  @default(true)
+
+  user       User       @relation(fields: [userId], references: [id])
+  smallGroup SmallGroup @relation(fields: [smallGroupId], references: [id])
+
+  @@unique([userId, smallGroupId])
+}
+
+model GroupJoinRequest {
+  id        String   @id @default(cuid())
+  userId    String
+  groupId   String
+  message   String?
+  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id])
+  group SmallGroup @relation(fields: [groupId], references: [id])
+
+  @@map("group_join_requests")
+}
+
+model Volunteer {
+  id           String   @id @default(cuid())
+  userId       String
+  ministryId   String
+  position     String
+  skills       String[]
+  availability String[]
+  isActive     Boolean  @default(true)
+
+  user     User     @relation(fields: [userId], references: [id])
+  ministry Ministry @relation(fields: [ministryId], references: [id])
+}
+
+model Facility {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  capacity    Int?
+  equipment   String[]
+  isActive    Boolean  @default(true)
+
+  bookings FacilityBooking[]
+}
+
+model FacilityBooking {
+  id         String   @id @default(cuid())
+  facilityId String
+  userId     String
+  startTime  DateTime
+  endTime    DateTime
+  purpose    String
+  status     String   @default("CONFIRMED")
+  createdAt  DateTime @default(now())
+
+  facility Facility @relation(fields: [facilityId], references: [id])
+}
+
+model PastoralCare {
+  id           String    @id @default(cuid())
+  memberId     String
+  pastorId     String
+  type         String // VISIT, COUNSELING, PRAYER, SUPPORT
+  date         DateTime
+  notes        String    @db.Text
+  followUpDate DateTime?
+  status       String    @default("COMPLETED")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now())
+
+  member User @relation("CareRecipient", fields: [memberId], references: [id])
+  pastor User @relation("CareProvider", fields: [pastorId], references: [id])
+
+  @@map("pastoral_care")
+}
+
+enum AddressType {
+  HOME
+  WORK
+  OTHER
+}
+
+model Address {
+  id        String      @id @default(cuid())
+  userId    String
+  firstName String
+  lastName  String
+  company   String?
+  address1  String
+  address2  String?
+  city      String
+  state     String
+  zipCode   String
+  country   String      @default("India")
+  phone     String?
+  isDefault Boolean     @default(false)
+  type      AddressType @default(HOME)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@map("addresses")
+}
+
+model File {
+  id           String   @id @default(cuid())
+  name         String
+  originalName String
+  fileName     String   @unique
+  path         String
+  url          String
+  mimeType     String?
+  size         Int?
+  type         String // 'file' or 'folder'
+  uploadedById String
+  parentId     String?
+  isPublic     Boolean  @default(false)
+  isDeleted    Boolean  @default(false)
+  tags         String[]
+  description  String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  uploadedBy User   @relation("UploadedFiles", fields: [uploadedById], references: [id])
+  parent     File?  @relation("FileHierarchy", fields: [parentId], references: [id])
+  children   File[] @relation("FileHierarchy")
+
+  @@map("files")
+}
+
+// Enhanced Conversation Model for all message types
+enum ConversationType {
+  DIRECT // One-on-one messaging
+  GROUP // Group conversations (small groups, teams, etc.)
+  BROADCAST // Broadcast channels (admin to many)
+  CHANNEL // Topic-based channels
+}
+
+model Conversation {
+  id          String           @id @default(cuid())
+  name        String? // Group name, broadcast channel name, etc.
+  description String? // Channel/group description
+  type        ConversationType @default(DIRECT)
+  imageUrl    String? // Group/channel avatar
+  settings    Json? // Flexible settings per conversation type
+  metadata    Json? // Additional metadata
+  isActive    Boolean          @default(true)
+  isArchived  Boolean          @default(false)
+  createdById String? // Who created this conversation
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @default(now())
+
+  participants ConversationParticipant[]
+  messages     Message[]
+  creator      User?                     @relation("CreatedConversations", fields: [createdById], references: [id])
+
+  @@map("conversations")
+}
+
+// Enhanced Participant Model with roles
+enum ParticipantRole {
+  ADMIN // Can manage conversation, add/remove members
+  MODERATOR // Can moderate content, manage some settings  
+  MEMBER // Regular participant
+  READONLY // Can only read messages (for broadcasts)
+  MUTED // Temporarily cannot send messages
+}
+
+model ConversationParticipant {
+  id             String          @id @default(cuid())
+  conversationId String
+  userId         String
+  role           ParticipantRole @default(MEMBER)
+  joinedAt       DateTime        @default(now())
+  lastReadAt     DateTime? // For unread count calculation
+  isMuted        Boolean         @default(false) // User muted notifications
+  isActive       Boolean         @default(true) // Active in conversation
+  metadata       Json? // Additional participant data
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+// Enhanced Message Model for all message types
+enum MessageType {
+  TEXT // Regular text message
+  IMAGE // Image message
+  FILE // File attachment
+  AUDIO // Audio message
+  VIDEO // Video message
+  SYSTEM // System notifications (user joined, left, etc.)
+  ANNOUNCEMENT // Special announcements
+  POLL // Poll messages
+  EVENT // Event notifications
+}
+
+model Message {
+  id             String      @id @default(cuid())
+  content        String      @db.Text
+  type           MessageType @default(TEXT)
+  senderId       String? // Null for system messages
+  conversationId String
+  replyToId      String? // For threaded conversations
+  metadata       Json? // File URLs, poll data, event data, etc.
+  isPinned       Boolean     @default(false)
+  isEdited       Boolean     @default(false)
+  editedAt       DateTime?
+  readBy         String[]    @default([]) // User IDs who read this message
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @default(now())
+
+  sender       User?             @relation("SentMessages", fields: [senderId], references: [id])
+  conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo      Message?          @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies      Message[]         @relation("MessageReplies")
+  reactions    MessageReaction[]
+
+  @@map("messages")
+}
+
+// Message Reactions (emojis) - Only one reaction per user per message
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String // Unicode emoji
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation("MessageReactions", fields: [userId], references: [id])
+
+  @@unique([messageId, userId]) // Only one reaction per user per message
+  @@map("message_reactions")
+}
+
+// Family Members
+model FamilyMember {
+  id           String    @id @default(cuid())
+  userId       String
+  linkedUserId String? // Link to existing user in the system
+  name         String
+  email        String?
+  phone        String?
+  relationship String // Spouse, Child, Parent, Sibling, etc.
+  dateOfBirth  DateTime?
+  anniversary  DateTime?
+  address      String?
+  notes        String?   @db.Text
+  image        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now())
+
+  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedUser User? @relation("LinkedFamilyMembers", fields: [linkedUserId], references: [id], onDelete: SetNull)
+
+  @@map("family_members")
+}
+
+// Comments System
+model Comment {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  authorId  String
+  parentId  String? // For nested replies
+  
+  // Polymorphic relations - content can be sermon, blog, etc.
+  sermonId  String?
+  blogPostId String?
+  
+  isApproved Boolean  @default(false) // For moderation
+  isEdited   Boolean  @default(false)
+  editedAt   DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author   User      @relation("CommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies  Comment[] @relation("CommentReplies")
+  
+  sermon   Sermon?   @relation(fields: [sermonId], references: [id], onDelete: Cascade)
+  blogPost BlogPost? @relation(fields: [blogPostId], references: [id], onDelete: Cascade)
+  
+  likes    Like[]
+
+  @@index([sermonId])
+  @@index([blogPostId])
+  @@index([createdAt])
+  @@map("comments")
+}
+
+// Likes System
+enum LikeType {
+  LIKE
+  LOVE
+  PRAY
+  AMEN
+}
+
+model Like {
+  id     String   @id @default(cuid())
+  type   LikeType @default(LIKE)
+  userId String
+  
+  // Polymorphic relations
+  sermonId   String?
+  blogPostId String?
+  commentId  String?
+  
+  createdAt DateTime @default(now())
+
+  user     User      @relation("UserLikes", fields: [userId], references: [id], onDelete: Cascade)
+  sermon   Sermon?   @relation(fields: [sermonId], references: [id], onDelete: Cascade)
+  blogPost BlogPost? @relation(fields: [blogPostId], references: [id], onDelete: Cascade)
+  comment  Comment?  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  // Ensure one like per user per content
+  @@unique([userId, sermonId])
+  @@unique([userId, blogPostId])
+  @@unique([userId, commentId])
+  @@map("likes")
+}

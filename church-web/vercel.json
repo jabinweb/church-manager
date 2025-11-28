@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "env": {
+    "PRISMA_GENERATE_DATAPROXY": "true"
+  },
+  "functions": {
+    "app/**/*.{js,ts,tsx}": {
+      "includeFiles": "prisma/schema.prisma"
+    }
+  }
+}
