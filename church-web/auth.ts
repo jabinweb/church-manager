@@ -108,5 +108,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       console.log("User signed out:", message)
     },
   },
+  trustHost: true,
+  debug: process.env.NODE_ENV === "development",
   secret: process.env.AUTH_SECRET,
 })
